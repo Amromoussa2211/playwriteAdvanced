@@ -1,0 +1,214 @@
+name: 🧪 Test Automation CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # تشغيل يومي في الساعة 2 صباحاً بتوقيت UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'نوع الاختبار للتشغيل'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - web
+          - mobile
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # ==========================================
+  # اختبارات الويب باستخدام Playwright
+  # ==========================================
+  web-tests:
+    name: 🌐 اختبارات الويب (Playwright)
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: 🧪 Run Playwright tests
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: npx playwright test --project=${{ matrix.browser }} --config=config/playwright.config.js
+
+      - name: 📊 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
+
+      - name: 📸 Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots-${{ matrix.browser }}
+          path: test-results/**/*.png
+          retention-days: 7
+
+  # ==========================================
+  # اختبارات الأجهزة المحمولة باستخدام Appium
+  # ==========================================
+  mobile-tests:
+    name: 📱 اختبارات المحمول (Appium)
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_type == 'mobile' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: ☕ Setup Java (for Android SDK)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📱 Create Android Emulator
+        run: |
+          echo "Creating AVD"
+          echo "no" | avdmanager create avd -n test_emulator -k "system-images;android-33;google_apis;x86_64" --force
+          echo "AVD created"
+
+      - name: 🚀 Start Android Emulator
+        run: |
+          echo "Starting emulator"
+          $ANDROID_HOME/emulator/emulator -avd test_emulator -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim &
+          adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+          echo "Emulator started"
+
+      - name: 🔧 Start Appium Server
+        run: |
+          npx appium --address 0.0.0.0 --port 4723 &
+          sleep 5
+          echo "Appium server started"
+
+      - name: 🧪 Run Mobile tests
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          MOBILE_APP_PACKAGE: ${{ secrets.MOBILE_APP_PACKAGE }}
+          APPIUM_HOST: localhost
+          APPIUM_PORT: 4723
+        run: npm run test:mobile
+
+      - name: 📊 Upload mobile test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-results
+          path: reports/
+          retention-days: 30
+
+  # ==========================================
+  # إرسال النتائج النهائية
+  # ==========================================
+  notify-results:
+    name: 📬 إرسال النتائج
+    runs-on: ubuntu-latest
+    needs: [web-tests, mobile-tests]
+    if: always()
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./all-results
+
+      - name: 📊 Generate final report
+        run: |
+          echo "تجميع النتائج النهائية..."
+          ls -R ./all-results
+
+      - name: 📧 Send notifications
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          node -e "
+          const SlackNotifier = require('./utils/slack-notifier');
+          const EmailNotifier = require('./utils/email-notifier');
+          
+          async function notify() {
+            const slack = new SlackNotifier();
+            const email = new EmailNotifier();
+            
+            const results = {
+              total: '${{ needs.web-tests.result }}' === 'success' ? 'نجح' : 'فشل',
+              testType: 'All Tests',
+              timestamp: new Date().toISOString()
+            };
+            
+            await slack.sendMessage('اكتملت جميع الاختبارات! 🎉');
+            console.log('تم إرسال الإشعارات');
+          }
+          
+          notify().catch(console.error);
+          "

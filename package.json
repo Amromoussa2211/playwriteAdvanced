@@ -1,0 +1,39 @@
+{
+  "name": "test-automation-framework",
+  "version": "1.0.0",
+  "description": "إطار عمل شامل للاختبار الآلي باستخدام Playwright و Appium",
+  "main": "index.js",
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "test:web": "playwright test --config=config/playwright.config.js",
+    "test:mobile": "node tests/mobile/runner.js",
+    "test:all": "npm run test:web && npm run test:mobile",
+    "test:parallel": "npm run test:web & npm run test:mobile",
+    "report": "playwright show-report",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:test": "docker-compose up --abort-on-container-exit"
+  },
+  "keywords": [
+    "playwright",
+    "appium",
+    "automation",
+    "testing",
+    "ci-cd"
+  ],
+  "author": "MiniMax Agent",
+  "license": "MIT",
+  "dependencies": {
+    "@playwright/test": "^1.40.0",
+    "appium": "^2.2.1",
+    "webdriverio": "^8.24.0",
+    "nodemailer": "^6.9.7",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "allure-playwright": "^2.10.0",
+    "allure-commandline": "^2.25.0"
+  }
+}

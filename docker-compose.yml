@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # Playwright Web Testing Service
+  playwright:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.playwright
+    container_name: playwright-tests
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_TO=${EMAIL_TO}
+      - APP_URL=${APP_URL}
+      - CI=true
+    volumes:
+      - ./reports:/app/reports
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+    networks:
+      - test-network
+
+  # Appium Mobile Testing Service
+  appium:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.appium
+    container_name: appium-tests
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_TO=${EMAIL_TO}
+      - MOBILE_APP_PACKAGE=${MOBILE_APP_PACKAGE}
+      - APPIUM_HOST=0.0.0.0
+      - APPIUM_PORT=4723
+      - CI=true
+    volumes:
+      - ./reports:/app/reports
+      - ./test-results:/app/test-results
+      - /dev/bus/usb:/dev/bus/usb  # For real devices
+    privileged: true  # Required for device access
+    ports:
+      - "4723:4723"
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  reports:
+  test-results:

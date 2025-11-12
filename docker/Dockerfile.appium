@@ -1,0 +1,52 @@
+# Dockerfile for Appium Mobile Tests
+FROM node:18-bullseye
+
+# Install dependencies for Android SDK and Appium
+RUN apt-get update && apt-get install -y \
+    openjdk-11-jdk \
+    wget \
+    unzip \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Android SDK
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
+
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
+    cd ${ANDROID_HOME}/cmdline-tools && \
+    wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip && \
+    unzip commandlinetools-linux-9477386_latest.zip && \
+    mv cmdline-tools latest && \
+    rm commandlinetools-linux-9477386_latest.zip
+
+# Accept licenses and install Android SDK components
+RUN yes | sdkmanager --licenses && \
+    sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install Node.js dependencies including Appium
+RUN npm ci
+
+# Install Appium drivers
+RUN npx appium driver install uiautomator2
+RUN npx appium driver install xcuitest
+
+# Copy application files
+COPY . .
+
+# Expose Appium server port
+EXPOSE 4723
+
+# Set environment variables
+ENV CI=true
+ENV NODE_ENV=production
+
+# Start Appium server in background and run tests
+CMD npx appium --address 0.0.0.0 --port 4723 & sleep 5 && npm run test:mobile
