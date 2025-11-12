@@ -1,116 +1,116 @@
-# 🚀 إطار عمل الاختبار الآلي الشامل
+# 🚀 Comprehensive Test Automation Framework
 
-إطار عمل متكامل للاختبار الآلي يدعم اختبارات الويب باستخدام **Playwright** واختبارات الأجهزة المحمولة باستخدام **Appium**، مع خط أنابيب CI/CD جاهز للاستخدام وإرسال النتائج تلقائياً إلى **Slack** و**البريد الإلكتروني**.
+An integrated automation framework that supports web testing using **Playwright** and mobile testing using **Appium**, with a ready-to-use CI/CD pipeline and automatic result delivery to **Slack** and **Email**.
 
-## ✨ المميزات
+## ✨ Features
 
-- ✅ **اختبارات الويب**: باستخدام Playwright مع دعم جميع المتصفحات (Chrome, Firefox, Safari)
-- ✅ **اختبارات المحمول**: باستخدام Appium لـ Android و iOS
-- ✅ **تثبيت تلقائي**: تثبيت جميع التبعيات تلقائياً عند أول تشغيل
-- ✅ **Docker**: دعم كامل للتشغيل باستخدام Docker لتوحيد البيئة
-- ✅ **CI/CD**: خط أنابيب جاهز على GitHub Actions
-- ✅ **إشعارات Slack**: إرسال النتائج تلقائياً إلى قناة Slack
-- ✅ **إشعارات البريد**: إرسال تقارير مفصلة لأصحاب المصلحة عبر البريد الإلكتروني
-- ✅ **تقارير شاملة**: تقارير HTML تفاعلية مع لقطات شاشة وفيديوهات
-- ✅ **إدارة آمنة**: استخدام متغيرات البيئة والأسرار بشكل آمن
+- ✅ **Web Testing**: Using Playwright with support for all browsers (Chrome, Firefox, Safari)
+- ✅ **Mobile Testing**: Using Appium for Android and iOS
+- ✅ **Automatic Installation**: Automatically installs all dependencies on first run
+- ✅ **Docker**: Full support for running with Docker for environment consistency
+- ✅ **CI/CD**: Ready pipeline on GitHub Actions
+- ✅ **Slack Notifications**: Automatically send results to Slack channel
+- ✅ **Email Notifications**: Send detailed reports to stakeholders via email
+- ✅ **Comprehensive Reports**: Interactive HTML reports with screenshots and videos
+- ✅ **Secure Management**: Use environment variables and secrets securely
 
-## 📋 المتطلبات الأساسية
+## 📋 Prerequisites
 
-### للتشغيل المحلي (بدون Docker)
+### For Local Running (without Docker)
 
-- **Node.js** 18 أو أحدث
-- **npm** أو **yarn**
+- **Node.js** 18 or later
+- **npm** or **yarn**
 - **Git**
 
-### للتشغيل باستخدام Docker
+### For Docker Running
 
-- **Docker** 20.10 أو أحدث
-- **Docker Compose** 2.0 أو أحدث
+- **Docker** 20.10 or later
+- **Docker Compose** 2.0 or later
 
-### لاختبارات Android
+### For Android Testing
 
-- **Java JDK** 11 أو أحدث
-- **Android SDK** (يتم تثبيته تلقائياً في Docker)
+- **Java JDK** 11 or later
+- **Android SDK** (automatically installed in Docker)
 
-### لاختبارات iOS
+### For iOS Testing
 
-- **macOS** (مطلوب)
-- **Xcode** و **Xcode Command Line Tools**
+- **macOS** (required)
+- **Xcode** and **Xcode Command Line Tools**
 - **iOS Simulator**
 
-## 🚀 البدء السريع
+## 🚀 Quick Start
 
-### 1. استنساخ المشروع
+### 1. Clone the Project
 
 ```bash
 git clone <repository-url>
 cd test-automation-framework
 ```
 
-### 2. التثبيت التلقائي
+### 2. Automatic Installation
 
 ```bash
 npm run setup
 ```
 
-هذا الأمر سيقوم بـ:
-- ✅ التحقق من Node.js و npm
-- ✅ تثبيت جميع التبعيات
-- ✅ تثبيت متصفحات Playwright
-- ✅ تثبيت تعريفات Appium
-- ✅ إنشاء ملف `.env` من `.env.example`
-- ✅ إنشاء المجلدات المطلوبة
+This command will:
+- ✅ Check Node.js and npm
+- ✅ Install all dependencies
+- ✅ Install Playwright browsers
+- ✅ Install Appium drivers
+- ✅ Create `.env` file from `.env.example`
+- ✅ Create required directories
 
-### 3. تكوين البيئة
+### 3. Environment Configuration
 
-قم بتحرير ملف `.env` وأضف البيانات الخاصة بك:
+Edit the `.env` file and add your data:
 
 ```env
-# بيانات Slack
+# Slack data
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
-# بيانات البريد الإلكتروني
+# Email data
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 EMAIL_TO=stakeholder1@example.com,stakeholder2@example.com
 
-# بيانات اختبارات الويب
+# Web testing data
 APP_URL=https://your-app-url.com
 
-# بيانات اختبارات المحمول
+# Mobile testing data
 MOBILE_APP_PACKAGE=com.example.yourapp
 MOBILE_APP_ACTIVITY=.MainActivity
 ```
 
-### 4. تشغيل الاختبارات
+### 4. Running Tests
 
-#### اختبارات الويب فقط
+#### Web tests only
 ```bash
 npm run test:web
 ```
 
-#### اختبارات المحمول فقط
+#### Mobile tests only
 ```bash
 npm run test:mobile
 ```
 
-#### جميع الاختبارات
+#### All tests
 ```bash
 npm run test:all
 ```
 
-#### باستخدام Docker
+#### Using Docker
 ```bash
-# بناء الحاويات
+# Build containers
 npm run docker:build
 
-# تشغيل الاختبارات
+# Run tests
 npm run docker:test
 ```
 
-## 📁 هيكل المشروع
+## 📁 Project Structure
 
 ```
 test-automation-framework/
@@ -118,200 +118,206 @@ test-automation-framework/
 │   └── workflows/
 │       └── ci.yml                 # GitHub Actions workflow
 ├── config/
-│   ├── playwright.config.js      # إعدادات Playwright
-│   └── appium.config.js          # إعدادات Appium
+│   ├── playwright.config.js      # Playwright settings
+│   └── appium.config.js          # Appium settings
 ├── docker/
-│   ├── Dockerfile.playwright     # Docker للويب
-│   └── Dockerfile.appium         # Docker للمحمول
+│   ├── Dockerfile.playwright     # Docker for web
+│   └── Dockerfile.appium         # Docker for mobile
 ├── tests/
-│   ├── web/                      # اختبارات الويب
+│   ├── web/                      # Web tests
 │   │   ├── login.spec.js
 │   │   └── homepage.spec.js
-│   └── mobile/                   # اختبارات المحمول
+│   └── mobile/                   # Mobile tests
 │       ├── android.test.js
+│       ├── ios.test.js
 │       └── runner.js
 ├── utils/
-│   ├── slack-notifier.js         # أداة Slack
-│   └── email-notifier.js         # أداة البريد
+│   ├── slack-notifier.js         # Slack utility
+│   ├── email-notifier.js         # Email utility
+│   └── results-parser.js         # Results parser
 ├── scripts/
-│   └── setup.js                  # سكريبت التثبيت
-├── reports/                      # التقارير
+│   ├── setup.js                  # Setup script
+│   └── post-test.js              # Post-test processing
+├── reports/                      # Reports
+├── test-results/                 # Test results
+├── playwright-report/            # Playwright HTML reports
 ├── docker-compose.yml            # Docker Compose
-├── package.json                  # التبعيات
-├── .env.example                  # مثال للبيئة
-└── README.md                     # هذا الملف
+├── package.json                  # Dependencies
+├── .env.example                  # Environment template
+├── .gitignore                    # Git ignore rules
+└── README.md                     # This file
 ```
 
-## 🔧 إعداد CI/CD
+## 🔧 CI/CD Setup
 
 ### GitHub Actions
 
-المشروع يأتي مع workflow جاهز في `.github/workflows/ci.yml`
+The project comes with a ready workflow in `.github/workflows/ci.yml`
 
-#### إعداد الأسرار (Secrets)
+#### Setting up Secrets
 
-انتقل إلى `Settings > Secrets and variables > Actions` في مستودع GitHub وأضف:
+Go to `Settings > Secrets and variables > Actions` in your GitHub repository and add:
 
-| Secret Name | الوصف | مطلوب |
-|------------|-------|-------|
-| `SLACK_WEBHOOK_URL` | رابط Webhook لـ Slack | نعم |
-| `SMTP_HOST` | خادم SMTP | نعم |
-| `SMTP_PORT` | منفذ SMTP | نعم |
-| `SMTP_USER` | اسم مستخدم البريد | نعم |
-| `SMTP_PASS` | كلمة مرور البريد | نعم |
-| `EMAIL_TO` | المستلمون (مفصولون بفواصل) | نعم |
-| `APP_URL` | رابط التطبيق | نعم |
-| `MOBILE_APP_PACKAGE` | اسم حزمة التطبيق | للمحمول |
+| Secret Name | Description | Required |
+|------------|-------------|----------|
+| `SLACK_WEBHOOK_URL` | Slack Webhook URL | Yes |
+| `SMTP_HOST` | SMTP server | Yes |
+| `SMTP_PORT` | SMTP port | Yes |
+| `SMTP_USER` | Email username | Yes |
+| `SMTP_PASS` | Email password | Yes |
+| `EMAIL_TO` | Recipients (comma-separated) | Yes |
+| `APP_URL` | Application URL | Yes |
+| `MOBILE_APP_PACKAGE` | App package name | For mobile |
 
-#### تشغيل يدوي
+#### Manual Trigger
 
-يمكنك تشغيل الاختبارات يدوياً من تبويب **Actions** في GitHub واختيار نوع الاختبار:
-- `all` - جميع الاختبارات
-- `web` - اختبارات الويب فقط
-- `mobile` - اختبارات المحمول فقط
+You can manually run tests from the **Actions** tab in GitHub and select test type:
+- `all` - All tests
+- `web` - Web tests only
+- `mobile` - Mobile tests only
 
 ### GitLab CI
 
-يمكن تحويل الإعداد لـ GitLab CI بإنشاء ملف `.gitlab-ci.yml`
+Can be converted to GitLab CI by creating `.gitlab-ci.yml` file
 
-## 📱 إعداد اختبارات المحمول
+## 📱 Mobile Testing Setup
 
 ### Android
 
-#### تشغيل المحاكي محلياً
+#### Running emulator locally
 
 ```bash
-# إنشاء محاكي جديد
+# Create new emulator
 avdmanager create avd -n test_emulator -k "system-images;android-33;google_apis;x86_64"
 
-# تشغيل المحاكي
+# Run emulator
 emulator -avd test_emulator
 
-# تشغيل Appium
+# Run Appium
 npx appium --address 0.0.0.0 --port 4723
 
-# في نافذة أخرى، تشغيل الاختبارات
+# In another window, run tests
 npm run test:mobile
 ```
 
-#### استخدام جهاز حقيقي
+#### Using real device
 
-1. قم بتفعيل وضع المطور على الجهاز
-2. فعّل USB Debugging
-3. وصّل الجهاز بالكمبيوتر
-4. تأكد من ظهور الجهاز: `adb devices`
-5. شغّل الاختبارات
+1. Enable Developer mode on the device
+2. Enable USB Debugging
+3. Connect device to computer
+4. Verify device appears: `adb devices`
+5. Run tests
 
 ### iOS
 
-يتطلب macOS مع Xcode:
+Requires macOS with Xcode:
 
 ```bash
-# تشغيل محاكي iOS
+# Run iOS simulator
 xcrun simctl boot "iPhone 14"
 
-# تشغيل Appium
+# Run Appium
 npx appium --address 0.0.0.0 --port 4723
 
-# تشغيل الاختبارات
+# Run tests
 npm run test:mobile
 ```
 
-## 📊 التقارير
+## 📊 Reports
 
-### تقارير Playwright
+### Playwright Reports
 
-يتم إنشاء تقارير HTML تفاعلية تلقائياً في مجلد `playwright-report/`
+Interactive HTML reports are automatically generated in `playwright-report/`
 
-لعرض التقرير:
+To view report:
 ```bash
 npm run report
 ```
 
-### لقطات الشاشة والفيديو
+### Screenshots and Videos
 
-يتم حفظ لقطات الشاشة والفيديوهات تلقائياً عند فشل الاختبار في `test-results/`
+Screenshots and videos are automatically saved on test failures in `test-results/`
 
-## 🔔 إعداد الإشعارات
+## 🔔 Setting up Notifications
 
 ### Slack
 
-1. انتقل إلى [Slack API](https://api.slack.com/messaging/webhooks)
-2. أنشئ Incoming Webhook جديد
-3. انسخ الرابط وأضفه إلى `.env` أو GitHub Secrets
+1. Go to [Slack API](https://api.slack.com/messaging/webhooks)
+2. Create a new Incoming Webhook
+3. Copy the URL and add it to `.env` or GitHub Secrets
 
-### البريد الإلكتروني
+### Email
 
 #### Gmail
 
-1. فعّل التحقق بخطوتين
-2. أنشئ "App Password" من [هنا](https://myaccount.google.com/apppasswords)
-3. استخدم App Password في `SMTP_PASS`
+1. Enable two-factor authentication
+2. Create "App Password" from [here](https://myaccount.google.com/apppasswords)
+3. Use App Password in `SMTP_PASS`
 
-#### SMTP مخصص
+#### Custom SMTP
 
-قم بتكوين `SMTP_HOST` و `SMTP_PORT` حسب مزود الخدمة
+Configure `SMTP_HOST` and `SMTP_PORT` according to your provider
 
 ## 🐳 Docker
 
-### بناء الصور
+### Building Images
 
 ```bash
-# بناء صورة Playwright
+# Build Playwright image
 docker build -f docker/Dockerfile.playwright -t playwright-tests .
 
-# بناء صورة Appium
+# Build Appium image
 docker build -f docker/Dockerfile.appium -t appium-tests .
 
-# أو استخدم Docker Compose
+# Or use Docker Compose
 docker-compose build
 ```
 
-### تشغيل الاختبارات
+### Running Tests
 
 ```bash
-# تشغيل الويب فقط
+# Run web only
 docker-compose up playwright
 
-# تشغيل المحمول فقط
+# Run mobile only
 docker-compose up appium
 
-# تشغيل الكل
+# Run all
 docker-compose up
 ```
 
-### إيقاف الحاويات
+### Stop Containers
 
 ```bash
 docker-compose down
 ```
 
-## 🧪 كتابة اختبارات جديدة
+## 🧪 Writing New Tests
 
-### اختبار ويب جديد
+### New Web Test
 
-أنشئ ملف في `tests/web/your-test.spec.js`:
+Create a file in `tests/web/your-test.spec.js`:
 
 ```javascript
 const { test, expect } = require('@playwright/test');
 
-test.describe('اختبارات جديدة', () => {
-  test('اختبار مثال', async ({ page }) => {
+test.describe('New Tests', () => {
+  test('Example test', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/عنوان الصفحة/);
+    await expect(page).toHaveTitle(/Page Title/);
   });
 });
 ```
 
-### اختبار محمول جديد
+### New Mobile Test
 
-أنشئ ملف في `tests/mobile/your-mobile-test.js`:
+Create a file in `tests/mobile/your-mobile-test.js`:
 
 ```javascript
 const { remote } = require('webdriverio');
 const appiumConfig = require('../../config/appium.config');
 
-describe('اختبار محمول جديد', () => {
+describe('New Mobile Test', () => {
   let driver;
 
   before(async function() {
@@ -329,112 +335,108 @@ describe('اختبار محمول جديد', () => {
     if (driver) await driver.deleteSession();
   });
 
-  it('اختبار مثال', async function() {
+  it('Example test', async function() {
     const element = await driver.$('~element-id');
     await element.waitForDisplayed({ timeout: 10000 });
   });
 });
 ```
 
-ثم أضف الملف إلى `tests/mobile/runner.js`
+Then add the file to `tests/mobile/runner.js`
 
-## 📝 نصائح وأفضل الممارسات
+## 📝 Tips and Best Practices
 
-### الأداء
+### Performance
 
-- استخدم التشغيل المتوازي للاختبارات
-- قلل من `waitForTimeout` واستخدم `waitForSelector` بدلاً منه
-- استخدم Page Objects pattern لإعادة استخدام الكود
+- Use parallel test execution
+- Minimize `waitForTimeout` and use `waitForSelector` instead
+- Use Page Objects pattern for code reusability
 
-### الصيانة
+### Maintenance
 
-- اجعل الاختبارات مستقلة عن بعضها
-- استخدم البيانات الديناميكية بدلاً من البيانات الثابتة
-- نظف البيانات بعد كل اختبار
+- Make tests independent of each other
+- Use dynamic data instead of static data
+- Clean up data after each test
 
-### الأمان
+### Security
 
-- لا تخزن البيانات الحساسة في الكود
-- استخدم `.env` ومتغيرات البيئة
-- أضف `.env` إلى `.gitignore`
+- Don't store sensitive data in code
+- Use `.env` and environment variables
+- Add `.env` to `.gitignore`
 
-## 🛠️ استكشاف الأخطاء
+## 🛠️ Troubleshooting
 
-### الاختبار لا يعمل
+### Test not working
 
 ```bash
-# تحقق من التبعيات
+# Check dependencies
 npm install
 
-# أعد تثبيت المتصفحات
+# Reinstall browsers
 npx playwright install --with-deps
 
-# تحقق من Appium
+# Check Appium
 npx appium driver list
 ```
 
-### مشاكل Docker
+### Docker issues
 
 ```bash
-# أعد بناء الصور
+# Rebuild images
 docker-compose build --no-cache
 
-# تنظيف الحاويات القديمة
+# Clean old containers
 docker system prune -a
 ```
 
-### مشاكل المحاكي
+### Emulator issues
 
 ```bash
-# التحقق من الأجهزة المتصلة
+# Check connected devices
 adb devices
 
-# إعادة تشغيل ADB
+# Restart ADB
 adb kill-server
 adb start-server
 ```
 
-## 📚 مصادر إضافية
+## 📚 Additional Resources
 
 - [Playwright Documentation](https://playwright.dev/)
 - [Appium Documentation](https://appium.io/)
 - [WebDriverIO Documentation](https://webdriver.io/)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 
-## 🤝 المساهمة
+## 🤝 Contributing
 
-المساهمات مرحب بها! يرجى:
+Contributions are welcome! Please:
 
-1. Fork المشروع
-2. إنشاء branch جديد (`git checkout -b feature/amazing-feature`)
-3. Commit التغييرات (`git commit -m 'Add amazing feature'`)
-4. Push إلى Branch (`git push origin feature/amazing-feature`)
-5. فتح Pull Request
+1. Fork the project
+2. Create a new branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📄 الترخيص
+## 📄 License
 
-هذا المشروع مرخص تحت MIT License
+This project is licensed under the MIT License
 
-## 👨‍💻 المؤلف
+## 👨‍💻 Author
 
-**AmrIbrahem**
-
----
-
-<div dir="rtl">
-
-## 💡 هل تحتاج مساعدة؟
-
-إذا واجهت أي مشاكل أو كان لديك أسئلة، يرجى:
-
-1. التحقق من قسم [استكشاف الأخطاء](#-استكشاف-الأخطاء)
-2. البحث في [Issues](https://github.com/your-repo/issues)
-3. فتح Issue جديد مع تفاصيل المشكلة
-
-</div>
+**MiniMax Agent**
 
 ---
 
-**جاهز للاستخدام! 🚀**
+## 💡 Need Help?
 
-ابدأ الآن بتشغيل `npm run setup` واستمتع بالاختبار الآلي!
+If you encounter any issues or have questions, please:
+
+1. Check the [Troubleshooting](#-troubleshooting) section
+2. Search in [Issues](https://github.com/your-repo/issues)
+3. Open a new issue with problem details
+
+---
+
+**Ready to Use! 🚀**
+
+Start now by running `npm run setup` and enjoy automated testing!

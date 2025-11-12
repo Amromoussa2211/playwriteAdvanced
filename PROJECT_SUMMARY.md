@@ -1,65 +1,65 @@
-# 📦 ملخص المشروع - إطار عمل الاختبار الآلي
+# 📦 Project Summary - Test Automation Framework
 
-## 🎯 نظرة عامة
+## 🎯 Overview
 
-تم إنشاء إطار عمل متكامل للاختبار الآلي يدعم اختبارات الويب والأجهزة المحمولة مع خط أنابيب CI/CD جاهز للاستخدام.
+A comprehensive test automation framework has been created that supports web and mobile testing with a ready-to-use CI/CD pipeline.
 
-## ✅ المكونات المنجزة
+## ✅ Completed Components
 
-### 1. البنية الأساسية
-- ✅ هيكل مشروع منظم وقابل للتوسع
-- ✅ إدارة التبعيات (package.json)
-- ✅ ملفات الإعدادات (.env, configs)
-- ✅ .gitignore شامل
+### 1. Core Framework
+- ✅ Organized and scalable project structure
+- ✅ Dependency management (package.json)
+- ✅ Configuration files (.env, configs)
+- ✅ Comprehensive .gitignore
 
-### 2. اختبارات الويب (Playwright)
-- ✅ إعدادات Playwright الكاملة
-- ✅ دعم جميع المتصفحات (Chrome, Firefox, Safari)
-- ✅ أمثلة اختبارات (Login, Homepage)
-- ✅ تقارير HTML تفاعلية
-- ✅ لقطات شاشة وفيديوهات عند الفشل
+### 2. Web Testing (Playwright)
+- ✅ Complete Playwright configuration
+- ✅ All browser support (Chrome, Firefox, Safari)
+- ✅ Test examples (Login, Homepage)
+- ✅ Interactive HTML reports
+- ✅ Screenshots and videos on failure
 
-### 3. اختبارات المحمول (Appium)
-- ✅ إعدادات Appium للـ Android و iOS
-- ✅ أمثلة اختبارات لكلا النظامين
-- ✅ Runner مخصص للاختبارات
-- ✅ دعم الأجهزة الحقيقية والمحاكيات
+### 3. Mobile Testing (Appium)
+- ✅ Appium configuration for Android and iOS
+- ✅ Test examples for both systems
+- ✅ Custom test runner
+- ✅ Real device and emulator support
 
 ### 4. Docker
-- ✅ Dockerfile للـ Playwright
-- ✅ Dockerfile للـ Appium
-- ✅ docker-compose.yml للتشغيل السهل
-- ✅ دعم الشبكات والـ volumes
+- ✅ Dockerfile for Playwright
+- ✅ Dockerfile for Appium
+- ✅ docker-compose.yml for easy setup
+- ✅ Network and volume support
 
 ### 5. CI/CD (GitHub Actions)
-- ✅ Workflow كامل للاختبارات
-- ✅ تشغيل تلقائي عند Push/PR
-- ✅ تشغيل يدوي مع خيارات
-- ✅ تشغيل مجدول (Cron)
-- ✅ رفع التقارير كـ Artifacts
+- ✅ Complete testing workflow
+- ✅ Automatic trigger on Push/PR
+- ✅ Manual trigger with options
+- ✅ Scheduled runs (Cron)
+- ✅ Report upload as Artifacts
 
-### 6. الإشعارات
-- ✅ إرسال تلقائي إلى Slack
-- ✅ إرسال تقارير عبر البريد الإلكتروني
-- ✅ تقارير HTML مصممة بشكل احترافي
-- ✅ إشعارات بداية ونهاية الاختبارات
+### 6. Notifications
+- ✅ Automatic delivery to Slack
+- ✅ Report delivery via email
+- ✅ Professionally designed HTML reports
+- ✅ Test start and end notifications
 
-### 7. أدوات مساعدة
-- ✅ سكريبت التثبيت التلقائي (setup.js)
-- ✅ محلل نتائج Playwright
-- ✅ سكريبت ما بعد الاختبار
-- ✅ إدارة آمنة للبيانات الحساسة
+### 7. Utilities
+- ✅ Automatic setup script (setup.js)
+- ✅ Playwright result parser
+- ✅ Post-test script
+- ✅ Secure sensitive data management
 
-### 8. التوثيق
-- ✅ README شامل بالعربية
-- ✅ دليل البدء السريع (QUICKSTART.md)
-- ✅ أمثلة متقدمة (EXAMPLES.md)
-- ✅ دليل حل المشاكل (TROUBLESHOOTING.md)
-- ✅ إرشادات المساهمة (CONTRIBUTING.md)
+### 8. Documentation
+- ✅ Comprehensive README in English
+- ✅ Quick start guide (QUICKSTART.md)
+- ✅ Advanced examples (EXAMPLES.md)
+- ✅ Troubleshooting guide (TROUBLESHOOTING.md)
+- ✅ Contribution guidelines (CONTRIBUTING.md)
 - ✅ CHANGELOG
 - ✅ LICENSE (MIT)
 
-## 📂 هيكل الملفات
+## 📂 File Structure
 
 ```
 test-automation-framework/
@@ -67,248 +67,250 @@ test-automation-framework/
 │   └── workflows/
 │       └── ci.yml                    # GitHub Actions CI/CD
 ├── config/
-│   ├── playwright.config.js         # إعدادات Playwright
-│   └── appium.config.js              # إعدادات Appium
+│   ├── playwright.config.js         # Playwright configuration
+│   └── appium.config.js              # Appium configuration
 ├── docker/
-│   ├── Dockerfile.playwright        # Docker للويب
-│   └── Dockerfile.appium             # Docker للمحمول
+│   ├── Dockerfile.playwright        # Docker for web
+│   └── Dockerfile.appium             # Docker for mobile
 ├── scripts/
-│   ├── setup.js                      # التثبيت التلقائي
-│   └── post-test.js                  # إرسال النتائج
+│   ├── setup.js                      # Automatic setup
+│   └── post-test.js                  # Results delivery
 ├── tests/
 │   ├── web/
-│   │   ├── login.spec.js            # اختبار تسجيل الدخول
-│   │   └── homepage.spec.js         # اختبار الصفحة الرئيسية
+│   │   ├── login.spec.js            # Login test
+│   │   └── homepage.spec.js         # Homepage test
 │   └── mobile/
-│       ├── android.test.js          # اختبارات Android
-│       ├── ios.test.js              # اختبارات iOS
-│       └── runner.js                # runner للمحمول
+│       ├── android.test.js          # Android tests
+│       ├── ios.test.js              # iOS tests
+│       └── runner.js                # Mobile runner
 ├── utils/
-│   ├── slack-notifier.js            # أداة Slack
-│   ├── email-notifier.js            # أداة البريد
-│   └── results-parser.js            # محلل النتائج
+│   ├── slack-notifier.js            # Slack utility
+│   ├── email-notifier.js            # Email utility
+│   └── results-parser.js            # Results parser
 ├── docker-compose.yml               # Docker Compose
-├── package.json                     # التبعيات والأوامر
-├── .env.example                     # مثال البيئة
+├── package.json                     # Dependencies and scripts
+├── .env.example                     # Environment template
 ├── .gitignore                       # Git ignore
-├── README.md                        # التوثيق الرئيسي
-├── QUICKSTART.md                    # البدء السريع
-├── EXAMPLES.md                      # أمثلة متقدمة
-├── TROUBLESHOOTING.md               # حل المشاكل
-├── CONTRIBUTING.md                  # إرشادات المساهمة
-├── CHANGELOG.md                     # سجل التغييرات
-└── LICENSE                          # الترخيص
+├── README.md                        # Main documentation
+├── QUICKSTART.md                    # Quick start guide
+├── EXAMPLES.md                      # Advanced examples
+├── TROUBLESHOOTING.md               # Troubleshooting
+├── CONTRIBUTING.md                  # Contribution guidelines
+├── CHANGELOG.md                     # Change log
+├── PROJECT_SUMMARY.md               # Project summary
+├── CHECKLIST.md                     # Setup checklist
+└── LICENSE                          # License
 ```
 
-## 🚀 كيفية البدء
+## 🚀 How to Start
 
-### 1. التثبيت
+### 1. Installation
 ```bash
 git clone <repository-url>
 cd test-automation-framework
 npm run setup
 ```
 
-### 2. التكوين
+### 2. Configuration
 ```bash
 cp .env.example .env
-# قم بتحديث البيانات في .env
+# Update data in .env
 ```
 
-### 3. التشغيل
+### 3. Execution
 ```bash
-# اختبارات الويب
+# Web tests
 npm run test:web
 
-# اختبارات المحمول
+# Mobile tests
 npm run test:mobile
 
 # Docker
 npm run docker:test
 ```
 
-## 📋 الأوامر المتاحة
+## 📋 Available Commands
 
-| الأمر | الوصف |
-|------|-------|
-| `npm run setup` | التثبيت التلقائي |
-| `npm run test:web` | اختبارات الويب |
-| `npm run test:mobile` | اختبارات المحمول |
-| `npm run test:all` | جميع الاختبارات |
-| `npm run test:parallel` | تشغيل متوازي |
-| `npm run report` | عرض تقرير Playwright |
-| `npm run docker:build` | بناء Docker |
-| `npm run docker:up` | تشغيل Docker |
-| `npm run docker:down` | إيقاف Docker |
-| `npm run docker:test` | اختبار في Docker |
+| Command | Description |
+|---------|-------------|
+| `npm run setup` | Automatic setup |
+| `npm run test:web` | Web tests |
+| `npm run test:mobile` | Mobile tests |
+| `npm run test:all` | All tests |
+| `npm run test:parallel` | Parallel execution |
+| `npm run report` | Show Playwright report |
+| `npm run docker:build` | Build Docker |
+| `npm run docker:up` | Start Docker |
+| `npm run docker:down` | Stop Docker |
+| `npm run docker:test` | Test in Docker |
 
-## 🔧 المتطلبات
+## 🔧 Requirements
 
-### أساسي
+### Core
 - Node.js 18+
 - npm
 
-### اختياري
+### Optional
 - Docker & Docker Compose
-- Java JDK 11+ (للمحمول)
-- Android SDK (للـ Android)
-- Xcode (للـ iOS)
+- Java JDK 11+ (for mobile)
+- Android SDK (for Android)
+- Xcode (for iOS)
 
-## 🌟 الميزات الرئيسية
+## 🌟 Key Features
 
-### 1. تثبيت تلقائي
-- التحقق من جميع التبعيات
-- تثبيت تلقائي لكل ما هو مطلوب
-- إنشاء المجلدات والملفات الضرورية
+### 1. Automatic Installation
+- Verify all dependencies
+- Automatically install everything required
+- Create necessary folders and files
 
-### 2. CI/CD جاهز
-- GitHub Actions مكتمل
-- دعم التشغيل اليدوي
-- تشغيل مجدول يومياً
-- رفع التقارير تلقائياً
+### 2. Ready CI/CD
+- Complete GitHub Actions
+- Manual trigger support
+- Daily scheduled runs
+- Automatic report upload
 
-### 3. إشعارات ذكية
-- Slack مع رسائل منسقة
-- بريد إلكتروني HTML احترافي
-- إحصائيات مفصلة
-- إشعارات فورية
+### 3. Smart Notifications
+- Slack with formatted messages
+- Professional HTML email
+- Detailed statistics
+- Instant notifications
 
-### 4. Docker كامل
-- صور جاهزة للاستخدام
-- بيئة موحدة
-- سهولة النشر
-- عزل كامل
+### 4. Complete Docker
+- Ready-to-use images
+- Unified environment
+- Easy deployment
+- Complete isolation
 
-### 5. أمان
-- متغيرات البيئة
+### 5. Security
+- Environment variables
 - GitHub Secrets
-- عدم تخزين البيانات الحساسة
-- أفضل الممارسات الأمنية
+- No sensitive data storage
+- Security best practices
 
-## 📊 التقارير
+## 📊 Reports
 
 ### Playwright
-- تقارير HTML تفاعلية
-- JSON و JUnit
-- لقطات شاشة
-- فيديوهات
+- Interactive HTML reports
+- JSON and JUnit
+- Screenshots
+- Videos
 
 ### Slack
-- رسائل منسقة
-- إحصائيات ملونة
-- إشعارات فورية
+- Formatted messages
+- Colorful statistics
+- Instant notifications
 
-### البريد
-- HTML احترافي
-- إحصائيات مفصلة
-- روابط للتقارير
+### Email
+- Professional HTML
+- Detailed statistics
+- Report links
 
-## 🔐 الأمان
+## 🔐 Security
 
-- ✅ استخدام `.env` للبيانات الحساسة
-- ✅ دعم GitHub Secrets
-- ✅ `.env` في `.gitignore`
-- ✅ لا تخزين للـ passwords في الكود
-- ✅ أمثلة واضحة في `.env.example`
+- ✅ Use `.env` for sensitive data
+- ✅ GitHub Secrets support
+- ✅ `.env` in `.gitignore`
+- ✅ No passwords stored in code
+- ✅ Clear examples in `.env.example`
 
-## 📖 الوثائق
+## 📖 Documentation
 
-| الملف | المحتوى |
+| File | Content |
 |------|---------|
-| README.md | التوثيق الرئيسي الشامل |
-| QUICKSTART.md | دليل البدء السريع |
-| EXAMPLES.md | أمثلة متقدمة |
-| TROUBLESHOOTING.md | حل المشاكل |
-| CONTRIBUTING.md | إرشادات المساهمة |
-| CHANGELOG.md | سجل التغييرات |
+| README.md | Comprehensive main documentation |
+| QUICKSTART.md | Quick start guide |
+| EXAMPLES.md | Advanced examples |
+| TROUBLESHOOTING.md | Troubleshooting |
+| CONTRIBUTING.md | Contribution guidelines |
+| CHANGELOG.md | Change log |
 
-## 🎓 أمثلة الاختبارات
+## 🎓 Test Examples
 
-### الويب
-- ✅ تسجيل الدخول
-- ✅ الصفحة الرئيسية
-- ✅ التنقل
-- ✅ النماذج
-- ✅ البحث
+### Web
+- ✅ Login
+- ✅ Homepage
+- ✅ Navigation
+- ✅ Forms
+- ✅ Search
 
-### المحمول
+### Mobile
 - ✅ Android (UiAutomator2)
 - ✅ iOS (XCUITest)
-- ✅ التفاعل مع العناصر
-- ✅ الإيماءات
-- ✅ لقطات الشاشة
+- ✅ Element interaction
+- ✅ Gestures
+- ✅ Screenshots
 
-## 🔄 التكامل
+## 🔄 Integration
 
-### متاح الآن
+### Currently Available
 - ✅ GitHub Actions
 - ✅ Slack
-- ✅ البريد الإلكتروني
+- ✅ Email
 - ✅ Docker
 
-### خطط مستقبلية
+### Future Plans
 - 📅 GitLab CI
 - 📅 Jenkins
 - 📅 Allure Reports
 - 📅 TestRail
 - 📅 BrowserStack
 
-## 💡 نصائح الاستخدام
+## 💡 Usage Tips
 
-### للبدء السريع
-1. اقرأ QUICKSTART.md
-2. شغل `npm run setup`
-3. حدّث `.env`
-4. شغل `npm run test:web`
+### For Quick Start
+1. Read QUICKSTART.md
+2. Run `npm run setup`
+3. Update `.env`
+4. Run `npm run test:web`
 
-### لإنتاج احترافي
-1. استخدم Docker
-2. فعّل CI/CD
-3. أضف Secrets في GitHub
-4. راقب الإشعارات
+### For Professional Production
+1. Use Docker
+2. Enable CI/CD
+3. Add Secrets in GitHub
+4. Monitor notifications
 
-### للتطوير
-1. اقرأ EXAMPLES.md
-2. استخدم Page Objects
-3. اكتب اختبارات نظيفة
-4. راجع CONTRIBUTING.md
+### For Development
+1. Read EXAMPLES.md
+2. Use Page Objects
+3. Write clean tests
+4. Review CONTRIBUTING.md
 
-## 🐛 حل المشاكل
+## 🐛 Troubleshooting
 
-راجع [TROUBLESHOOTING.md](TROUBLESHOOTING.md) للحلول الشاملة.
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for comprehensive solutions.
 
-### مشاكل شائعة:
-- المتصفحات لا تعمل → `npx playwright install --with-deps`
-- Appium لا يتصل → تحقق من `adb devices`
-- Docker بطيء → استخدم `--no-cache`
-- الإشعارات لا ترسل → تحقق من `.env`
+### Common Issues:
+- Browsers not working → `npx playwright install --with-deps`
+- Appium not connecting → check `adb devices`
+- Docker slow → use `--no-cache`
+- Notifications not sending → check `.env`
 
-## 🤝 المساهمة
+## 🤝 Contributing
 
-نرحب بالمساهمات! راجع [CONTRIBUTING.md](CONTRIBUTING.md)
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md)
 
-1. Fork المشروع
-2. أنشئ Branch (`feature/amazing-feature`)
-3. Commit التغييرات
-4. Push وافتح PR
+1. Fork the project
+2. Create branch (`feature/amazing-feature`)
+3. Commit changes
+4. Push and open PR
 
-## 📜 الترخيص
+## 📜 License
 
-MIT License - راجع [LICENSE](LICENSE)
+MIT License - See [LICENSE](LICENSE)
 
-## 📞 الدعم
+## 📞 Support
 
-- 📧 افتح Issue على GitHub
-- 📚 راجع الوثائق
-- 💬 اطرح أسئلة في Discussions
+- 📧 Open Issue on GitHub
+- 📚 Review documentation
+- 💬 Ask questions in Discussions
 
-## 🙏 شكر خاص
+## 🙏 Special Thanks
 
-شكراً لاستخدام إطار عمل الاختبار الآلي!
+Thank you for using the test automation framework!
 
 ---
 
-## ✨ جاهز للاستخدام!
+## ✨ Ready to Use!
 
 ```bash
 npm run setup
@@ -318,7 +320,6 @@ npm run test:web
 **Happy Testing! 🚀**
 
 ---
-
 **المؤلف:** Amr Ibrahem Moussa ||amro_kaza@hotmail.com||01143236791 
 **الإصدار:** 1.0.0  
 **التاريخ:** 2025-11-12

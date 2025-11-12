@@ -1,26 +1,29 @@
-# 📚 أمثلة متقدمة للاختبارات
+# 📚 Advanced Test Examples
 
-هذا الملف يحتوي على أمثلة متقدمة لمختلف سيناريوهات الاختبار.
+This file contains advanced examples for various testing scenarios.
 
-## 📑 جدول المحتويات
+## 📑 Table of Contents
 
-- [اختبارات API](#اختبارات-api)
-- [اختبارات الأداء](#اختبارات-الأداء)
+- [API Testing](#api-testing)
+- [Performance Testing](#performance-testing)
 - [Page Object Model](#page-object-model)
 - [Data-Driven Testing](#data-driven-testing)
-- [اختبارات متقدمة للمحمول](#اختبارات-متقدمة-للمحمول)
-- [اختبارات الأمان](#اختبارات-الأمان)
+- [Advanced Mobile Testing](#advanced-mobile-testing)
+- [Security Testing](#security-testing)
+- [Accessibility Testing](#accessibility-testing)
+- [Responsive Design Testing](#responsive-design-testing)
+- [Advanced Tips](#advanced-tips)
 
 ---
 
-## اختبارات API
+## API Testing
 
-### اختبار GET Request
+### GET Request Test
 
 ```javascript
 const { test, expect } = require('@playwright/test');
 
-test('اختبار API - الحصول على قائمة المستخدمين', async ({ request }) => {
+test('API Test - Get User List', async ({ request }) => {
   const response = await request.get('https://api.example.com/users');
   
   expect(response.ok()).toBeTruthy();
@@ -30,17 +33,17 @@ test('اختبار API - الحصول على قائمة المستخدمين', a
   expect(Array.isArray(data)).toBeTruthy();
   expect(data.length).toBeGreaterThan(0);
   
-  console.log(`✅ تم الحصول على ${data.length} مستخدم`);
+  console.log(`✅ Retrieved ${data.length} users`);
 });
 ```
 
-### اختبار POST Request
+### POST Request Test
 
 ```javascript
-test('اختبار API - إنشاء مستخدم جديد', async ({ request }) => {
+test('API Test - Create New User', async ({ request }) => {
   const newUser = {
-    name: 'أحمد محمد',
-    email: 'ahmed@example.com',
+    name: 'John Doe',
+    email: 'john@example.com',
     role: 'user'
   };
   
@@ -56,15 +59,15 @@ test('اختبار API - إنشاء مستخدم جديد', async ({ request }) 
   expect(createdUser.email).toBe(newUser.email);
   expect(createdUser.id).toBeDefined();
   
-  console.log(`✅ تم إنشاء المستخدم بـ ID: ${createdUser.id}`);
+  console.log(`✅ User created with ID: ${createdUser.id}`);
 });
 ```
 
-### اختبار مع Authentication
+### Authentication Test
 
 ```javascript
-test('اختبار API مع المصادقة', async ({ request }) => {
-  // الحصول على Token
+test('API Test with Authentication', async ({ request }) => {
+  // Get Token
   const loginResponse = await request.post('https://api.example.com/auth/login', {
     data: {
       email: 'user@example.com',
@@ -74,7 +77,7 @@ test('اختبار API مع المصادقة', async ({ request }) => {
   
   const { token } = await loginResponse.json();
   
-  // استخدام Token في الطلب
+  // Use Token in request
   const response = await request.get('https://api.example.com/profile', {
     headers: {
       'Authorization': `Bearer ${token}`
@@ -89,12 +92,12 @@ test('اختبار API مع المصادقة', async ({ request }) => {
 
 ---
 
-## اختبارات الأداء
+## Performance Testing
 
-### قياس وقت تحميل الصفحة
+### Page Load Time Measurement
 
 ```javascript
-test('قياس أداء تحميل الصفحة', async ({ page }) => {
+test('Page Load Performance Test', async ({ page }) => {
   const startTime = Date.now();
   
   await page.goto('https://example.com');
@@ -102,19 +105,19 @@ test('قياس أداء تحميل الصفحة', async ({ page }) => {
   
   const loadTime = Date.now() - startTime;
   
-  expect(loadTime).toBeLessThan(3000); // يجب أن تحمل خلال 3 ثواني
+  expect(loadTime).toBeLessThan(3000); // Should load within 3 seconds
   
-  console.log(`⏱️  وقت التحميل: ${loadTime}ms`);
+  console.log(`⏱️ Load time: ${loadTime}ms`);
 });
 ```
 
-### قياس أداء API
+### API Performance Test
 
 ```javascript
-test('قياس أداء API', async ({ request }) => {
+test('API Performance Test', async ({ request }) => {
   const times = [];
   
-  // تشغيل 10 طلبات
+  // Run 10 requests
   for (let i = 0; i < 10; i++) {
     const start = Date.now();
     await request.get('https://api.example.com/users');
@@ -126,22 +129,22 @@ test('قياس أداء API', async ({ request }) => {
   const maxTime = Math.max(...times);
   const minTime = Math.min(...times);
   
-  console.log(`📊 متوسط الوقت: ${avgTime.toFixed(2)}ms`);
-  console.log(`📊 أسرع طلب: ${minTime}ms`);
-  console.log(`📊 أبطأ طلب: ${maxTime}ms`);
+  console.log(`📊 Average time: ${avgTime.toFixed(2)}ms`);
+  console.log(`📊 Fastest request: ${minTime}ms`);
+  console.log(`📊 Slowest request: ${maxTime}ms`);
   
   expect(avgTime).toBeLessThan(500);
 });
 ```
 
-### اختبار الحمل البسيط
+### Simple Load Test
 
 ```javascript
-test('اختبار الحمل - 50 طلب متزامن', async ({ request }) => {
+test('Load Test - 50 Concurrent Requests', async ({ request }) => {
   const promises = [];
   const startTime = Date.now();
   
-  // إنشاء 50 طلب متزامن
+  // Create 50 concurrent requests
   for (let i = 0; i < 50; i++) {
     promises.push(request.get('https://api.example.com/health'));
   }
@@ -149,11 +152,11 @@ test('اختبار الحمل - 50 طلب متزامن', async ({ request }) => 
   const responses = await Promise.all(promises);
   const duration = Date.now() - startTime;
   
-  // التحقق من نجاح جميع الطلبات
+  // Check success of all requests
   const successfulRequests = responses.filter(r => r.ok()).length;
   
-  console.log(`✅ ${successfulRequests}/${responses.length} طلب نجح`);
-  console.log(`⏱️  المدة الإجمالية: ${duration}ms`);
+  console.log(`✅ ${successfulRequests}/${responses.length} requests succeeded`);
+  console.log(`⏱️ Total duration: ${duration}ms`);
   
   expect(successfulRequests).toBe(50);
   expect(duration).toBeLessThan(5000);
@@ -164,7 +167,7 @@ test('اختبار الحمل - 50 طلب متزامن', async ({ request }) => 
 
 ## Page Object Model
 
-### تعريف Page Object
+### Page Object Definition
 
 ```javascript
 // pages/LoginPage.js
@@ -199,12 +202,12 @@ class LoginPage {
 module.exports = LoginPage;
 ```
 
-### استخدام Page Object
+### Using Page Object
 
 ```javascript
 const LoginPage = require('./pages/LoginPage');
 
-test('تسجيل الدخول باستخدام Page Object', async ({ page }) => {
+test('Login using Page Object', async ({ page }) => {
   const loginPage = new LoginPage(page);
   
   await loginPage.goto();
@@ -213,7 +216,7 @@ test('تسجيل الدخول باستخدام Page Object', async ({ page }) =>
   await expect(page).toHaveURL(/.*dashboard/);
 });
 
-test('رسالة خطأ عند بيانات خاطئة', async ({ page }) => {
+test('Error message with wrong credentials', async ({ page }) => {
   const loginPage = new LoginPage(page);
   
   await loginPage.goto();
@@ -221,7 +224,7 @@ test('رسالة خطأ عند بيانات خاطئة', async ({ page }) => {
   
   expect(await loginPage.isErrorVisible()).toBeTruthy();
   const errorText = await loginPage.getErrorMessage();
-  expect(errorText).toContain('بيانات غير صحيحة');
+  expect(errorText).toContain('Invalid credentials');
 });
 ```
 
@@ -229,13 +232,13 @@ test('رسالة خطأ عند بيانات خاطئة', async ({ page }) => {
 
 ## Data-Driven Testing
 
-### استخدام البيانات من ملف
+### Using Data from File
 
 ```javascript
 const testData = require('./data/users.json');
 
 testData.forEach(user => {
-  test(`اختبار تسجيل دخول - ${user.name}`, async ({ page }) => {
+  test(`Login test - ${user.name}`, async ({ page }) => {
     await page.goto('/login');
     await page.fill('[name="email"]', user.email);
     await page.fill('[name="password"]', user.password);
@@ -250,7 +253,7 @@ testData.forEach(user => {
 });
 ```
 
-### استخدام CSV
+### Using CSV
 
 ```javascript
 const fs = require('fs');
@@ -258,14 +261,14 @@ const csv = require('csv-parser');
 
 const testCases = [];
 
-// قراءة CSV
+// Read CSV
 fs.createReadStream('data/test-cases.csv')
   .pipe(csv())
   .on('data', (row) => testCases.push(row))
   .on('end', () => {
     testCases.forEach(testCase => {
       test(`${testCase.scenario}`, async ({ page }) => {
-        // تنفيذ الاختبار حسب البيانات
+        // Execute test based on data
       });
     });
   });
@@ -273,15 +276,15 @@ fs.createReadStream('data/test-cases.csv')
 
 ---
 
-## اختبارات متقدمة للمحمول
+## Advanced Mobile Testing
 
-### Swipe و Scroll
+### Swipe and Scroll
 
 ```javascript
-it('اختبار السحب والتمرير', async function() {
+it('Swipe and Scroll Test', async function() {
   const { width, height } = await driver.getWindowSize();
   
-  // السحب من اليمين لليسار
+  // Swipe from right to left
   await driver.touchPerform([
     { action: 'press', options: { x: width * 0.8, y: height * 0.5 } },
     { action: 'wait', options: { ms: 100 } },
@@ -291,7 +294,7 @@ it('اختبار السحب والتمرير', async function() {
   
   await driver.pause(1000);
   
-  // التمرير لأعلى
+  // Scroll up
   await driver.touchPerform([
     { action: 'press', options: { x: width * 0.5, y: height * 0.8 } },
     { action: 'wait', options: { ms: 100 } },
@@ -301,39 +304,39 @@ it('اختبار السحب والتمرير', async function() {
 });
 ```
 
-### التعامل مع Alerts
+### Handling Alerts
 
 ```javascript
-it('التعامل مع التنبيهات', async function() {
-  // النقر على زر يظهر Alert
+it('Handle Alerts', async function() {
+  // Click button that shows Alert
   const button = await driver.$('~alert-button');
   await button.click();
   
   await driver.pause(1000);
   
-  // الحصول على نص Alert
+  // Get Alert text
   const alertText = await driver.getAlertText();
   console.log(`Alert Text: ${alertText}`);
   
-  // قبول Alert
+  // Accept Alert
   await driver.acceptAlert();
   
-  // أو رفض Alert
+  // Or dismiss Alert
   // await driver.dismissAlert();
 });
 ```
 
-### التعامل مع الأذونات
+### Handling Permissions
 
 ```javascript
-it('التعامل مع أذونات التطبيق', async function() {
-  // منح إذن الموقع
+it('Handle App Permissions', async function() {
+  // Grant location permission
   await driver.execute('mobile: shell', {
     command: 'appops',
     args: ['set', process.env.MOBILE_APP_PACKAGE, 'android:fine_location', 'allow']
   });
   
-  // منح إذن الكاميرا
+  // Grant camera permission
   await driver.execute('mobile: shell', {
     command: 'pm',
     args: ['grant', process.env.MOBILE_APP_PACKAGE, 'android.permission.CAMERA']
@@ -341,55 +344,55 @@ it('التعامل مع أذونات التطبيق', async function() {
 });
 ```
 
-### اختبار الاتجاه (Orientation)
+### Orientation Test
 
 ```javascript
-it('اختبار تغيير الاتجاه', async function() {
-  // الحصول على الاتجاه الحالي
+it('Test Orientation Change', async function() {
+  // Get current orientation
   const currentOrientation = await driver.getOrientation();
-  console.log(`الاتجاه الحالي: ${currentOrientation}`);
+  console.log(`Current orientation: ${currentOrientation}`);
   
-  // تغيير إلى الوضع الأفقي
+  // Change to landscape
   await driver.setOrientation('LANDSCAPE');
   await driver.pause(2000);
   
-  // التحقق من الاتجاه
+  // Verify orientation
   const newOrientation = await driver.getOrientation();
   expect(newOrientation).toBe('LANDSCAPE');
   
-  // العودة إلى الوضع العمودي
+  // Return to portrait
   await driver.setOrientation('PORTRAIT');
 });
 ```
 
 ---
 
-## اختبارات الأمان
+## Security Testing
 
-### اختبار XSS
+### XSS Test
 
 ```javascript
-test('اختبار حماية من XSS', async ({ page }) => {
+test('XSS Protection Test', async ({ page }) => {
   const xssPayload = '<script>alert("XSS")</script>';
   
   await page.goto('/search');
   await page.fill('[name="query"]', xssPayload);
   await page.click('button[type="submit"]');
   
-  // التحقق من أن السكريبت لم يتم تنفيذه
+  // Verify script was not executed
   const pageContent = await page.content();
   expect(pageContent).not.toContain('<script>alert("XSS")</script>');
   
-  // التحقق من أن النص تم escape بشكل صحيح
+  // Verify text was properly escaped
   const results = await page.locator('.search-results').textContent();
   expect(results).toContain('&lt;script&gt;');
 });
 ```
 
-### اختبار SQL Injection
+### SQL Injection Test
 
 ```javascript
-test('اختبار حماية من SQL Injection', async ({ request }) => {
+test('SQL Injection Protection Test', async ({ request }) => {
   const sqlPayload = "'; DROP TABLE users; --";
   
   const response = await request.post('/api/login', {
@@ -399,32 +402,32 @@ test('اختبار حماية من SQL Injection', async ({ request }) => {
     }
   });
   
-  // يجب أن يفشل الطلب بشكل آمن
+  // Should fail safely
   expect(response.status()).toBe(400);
   
-  // التحقق من عدم تنفيذ SQL
+  // Verify SQL was not executed
   const dbCheck = await request.get('/api/users');
   expect(dbCheck.ok()).toBeTruthy();
 });
 ```
 
-### اختبار CSRF
+### CSRF Test
 
 ```javascript
-test('اختبار حماية CSRF', async ({ page, request }) => {
+test('CSRF Protection Test', async ({ page, request }) => {
   await page.goto('/login');
   
-  // تسجيل الدخول
+  // Login
   await page.fill('[name="email"]', 'user@example.com');
   await page.fill('[name="password"]', 'password123');
   await page.click('button[type="submit"]');
   
-  // محاولة إرسال طلب بدون CSRF token
+  // Attempt to send request without CSRF token
   const response = await request.post('/api/profile/update', {
     data: {
       name: 'Hacked Name'
     }
-    // بدون CSRF token
+    // Without CSRF token
   });
   
   expect(response.status()).toBe(403);
@@ -433,20 +436,20 @@ test('اختبار حماية CSRF', async ({ page, request }) => {
 
 ---
 
-## اختبارات Accessibility
+## Accessibility Testing
 
 ```javascript
-test('اختبار إمكانية الوصول', async ({ page }) => {
+test('Accessibility Test', async ({ page }) => {
   await page.goto('/');
   
-  // التحقق من وجود alt text للصور
+  // Check for alt text on images
   const images = await page.locator('img').all();
   for (const img of images) {
     const alt = await img.getAttribute('alt');
     expect(alt).toBeTruthy();
   }
   
-  // التحقق من ARIA labels
+  // Check ARIA labels
   const buttons = await page.locator('button').all();
   for (const button of buttons) {
     const ariaLabel = await button.getAttribute('aria-label');
@@ -454,7 +457,7 @@ test('اختبار إمكانية الوصول', async ({ page }) => {
     expect(ariaLabel || text).toBeTruthy();
   }
   
-  // التحقق من التباين اللوني (يحتاج إلى أداة إضافية)
+  // Check color contrast (requires additional tool)
   // await injectAxe(page);
   // const results = await checkA11y(page);
 });
@@ -462,7 +465,7 @@ test('اختبار إمكانية الوصول', async ({ page }) => {
 
 ---
 
-## اختبارات Responsive Design
+## Responsive Design Testing
 
 ```javascript
 const viewports = [
@@ -472,7 +475,7 @@ const viewports = [
 ];
 
 viewports.forEach(viewport => {
-  test(`اختبار ${viewport.name} - ${viewport.width}x${viewport.height}`, async ({ page }) => {
+  test(`Test ${viewport.name} - ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize({
       width: viewport.width,
       height: viewport.height
@@ -480,13 +483,13 @@ viewports.forEach(viewport => {
     
     await page.goto('/');
     
-    // التقاط لقطة شاشة
+    // Take screenshot
     await page.screenshot({
       path: `screenshots/${viewport.name}.png`,
       fullPage: true
     });
     
-    // التحقق من ظهور العناصر بشكل صحيح
+    // Verify elements appear correctly
     const nav = page.locator('nav');
     await expect(nav).toBeVisible();
   });
@@ -495,16 +498,16 @@ viewports.forEach(viewport => {
 
 ---
 
-## نصائح متقدمة
+## Advanced Tips
 
-### استخدام Fixtures
+### Using Fixtures
 
 ```javascript
 const { test: base } = require('@playwright/test');
 
 const test = base.extend({
   authenticatedPage: async ({ page }, use) => {
-    // تسجيل الدخول مرة واحدة
+    // Login once
     await page.goto('/login');
     await page.fill('[name="email"]', 'user@example.com');
     await page.fill('[name="password"]', 'password123');
@@ -515,16 +518,16 @@ const test = base.extend({
   }
 });
 
-test('اختبار مع مصادقة جاهزة', async ({ authenticatedPage }) => {
+test('Test with pre-authenticated user', async ({ authenticatedPage }) => {
   await authenticatedPage.goto('/profile');
-  // المستخدم مسجل دخول بالفعل
+  // User is already logged in
 });
 ```
 
 ### Retry Strategy
 
 ```javascript
-test('اختبار مع إعادة محاولة مخصصة', async ({ page }) => {
+test('Test with Custom Retry', async ({ page }) => {
   test.setTimeout(60000);
   
   let attempts = 0;
@@ -538,7 +541,7 @@ test('اختبار مع إعادة محاولة مخصصة', async ({ page }) =>
     } catch (error) {
       attempts++;
       if (attempts === maxAttempts) throw error;
-      console.log(`إعادة المحاولة ${attempts}/${maxAttempts}`);
+      console.log(`Retry attempt ${attempts}/${maxAttempts}`);
       await page.waitForTimeout(2000);
     }
   }
@@ -547,6 +550,6 @@ test('اختبار مع إعادة محاولة مخصصة', async ({ page }) =>
 
 ---
 
-**للمزيد من الأمثلة، راجع:**
+**For more examples, see:**
 - [Playwright Examples](https://playwright.dev/docs/examples)
 - [Appium Examples](https://github.com/appium/appium/tree/master/sample-code)

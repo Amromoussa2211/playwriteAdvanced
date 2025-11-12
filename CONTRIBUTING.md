@@ -1,223 +1,223 @@
-# 🤝 إرشادات المساهمة
+# 🤝 Contributing Guidelines
 
-شكراً لاهتمامك بالمساهمة في إطار عمل الاختبار الآلي! نرحب بجميع المساهمات من الجميع.
+Thank you for your interest in contributing to the test automation framework! We welcome contributions from everyone.
 
-## 📋 جدول المحتويات
+## 📑 Table of Contents
 
-- [كيفية المساهمة](#كيفية-المساهمة)
-- [الإبلاغ عن الأخطاء](#الإبلاغ-عن-الأخطاء)
-- [اقتراح ميزات جديدة](#اقتراح-ميزات-جديدة)
-- [إرشادات الكود](#إرشادات-الكود)
-- [عملية المراجعة](#عملية-المراجعة)
+- [How to Contribute](#how-to-contribute)
+- [Reporting Bugs](#reporting-bugs)
+- [Suggesting Features](#suggesting-features)
+- [Code Guidelines](#code-guidelines)
+- [Review Process](#review-process)
 
-## كيفية المساهمة
+## How to Contribute
 
-### 1. Fork المشروع
+### 1. Fork the Project
 
-انقر على زر "Fork" في أعلى الصفحة
+Click the "Fork" button at the top of the page
 
-### 2. Clone المستودع
+### 2. Clone the Repository
 
 ```bash
 git clone https://github.com/YOUR-USERNAME/test-automation-framework.git
 cd test-automation-framework
 ```
 
-### 3. إنشاء Branch جديد
+### 3. Create New Branch
 
 ```bash
 git checkout -b feature/amazing-feature
 ```
 
-تسمية الـ Branches:
-- `feature/feature-name` - للميزات الجديدة
-- `fix/bug-name` - لإصلاح الأخطاء
-- `docs/description` - للتوثيق
-- `refactor/description` - لتحسين الكود
+Branch naming:
+- `feature/feature-name` - For new features
+- `fix/bug-name` - For bug fixes
+- `docs/description` - For documentation
+- `refactor/description` - For code improvements
 
-### 4. إجراء التغييرات
+### 4. Make Changes
 
-- اكتب كود نظيف وقابل للقراءة
-- أضف تعليقات مفيدة بالعربية
-- اتبع إرشادات الكود أدناه
+- Write clean, readable code
+- Add helpful comments in English
+- Follow code guidelines below
 
-### 5. اختبار التغييرات
+### 5. Test Changes
 
 ```bash
-# تثبيت التبعيات
+# Install dependencies
 npm install
 
-# تشغيل الاختبارات
+# Run tests
 npm run test:web
 
-# التحقق من عدم وجود أخطاء
-npm run lint # (إذا كان متاحاً)
+# Check for linting errors
+npm run lint # (if available)
 ```
 
-### 6. Commit التغييرات
+### 6. Commit Changes
 
 ```bash
 git add .
-git commit -m "إضافة ميزة رائعة"
+git commit -m "Add amazing feature"
 ```
 
-رسائل Commit يجب أن تكون:
-- واضحة ومختصرة
-- تصف ماذا وليس كيف
-- بالعربية أو الإنجليزية
+Commit messages should be:
+- Clear and concise
+- Describe what, not how
+- In English
 
-أمثلة جيدة:
+Good examples:
 ```
-✅ إضافة دعم لتقارير Allure
-✅ إصلاح مشكلة اتصال Appium
-✅ تحديث التوثيق لاختبارات iOS
+✅ Add support for Allure reports
+✅ Fix Appium connection issue
+✅ Update iOS testing documentation
 ```
 
-أمثلة سيئة:
+Bad examples:
 ```
-❌ تحديث
+❌ update
 ❌ fix
 ❌ changes
 ```
 
-### 7. Push إلى Branch
+### 7. Push to Branch
 
 ```bash
 git push origin feature/amazing-feature
 ```
 
-### 8. فتح Pull Request
+### 8. Open Pull Request
 
-1. اذهب إلى المستودع الأصلي
-2. انقر على "New Pull Request"
-3. اختر Branch الخاص بك
-4. اكتب وصفاً واضحاً للتغييرات
+1. Go to original repository
+2. Click "New Pull Request"
+3. Select your branch
+4. Write clear description of changes
 
-## الإبلاغ عن الأخطاء
+## Reporting Bugs
 
-### قبل الإبلاغ
+### Before Reporting
 
-- تحقق من [Issues](https://github.com/your-repo/issues) الموجودة
-- تأكد من أنك تستخدم أحدث إصدار
-- جرب إعادة إنتاج المشكلة
+- Check existing [Issues](https://github.com/your-repo/issues)
+- Make sure you're using the latest version
+- Try to reproduce the issue
 
-### كيفية الإبلاغ
+### How to Report
 
-افتح Issue جديد وقدم:
+Open a new Issue and provide:
 
-1. **العنوان**: وصف مختصر للمشكلة
-2. **الوصف**: شرح تفصيلي للمشكلة
-3. **خطوات إعادة الإنتاج**:
+1. **Title**: Brief description of the issue
+2. **Description**: Detailed explanation of the problem
+3. **Steps to reproduce**:
    ```
-   1. اذهب إلى...
-   2. انقر على...
-   3. شاهد الخطأ
+   1. Go to...
+   2. Click on...
+   3. See error
    ```
-4. **السلوك المتوقع**: ماذا كان يجب أن يحدث
-5. **السلوك الفعلي**: ماذا حدث فعلياً
-6. **لقطات شاشة**: إن أمكن
-7. **البيئة**:
-   - نظام التشغيل:
-   - إصدار Node.js:
-   - إصدار المشروع:
+4. **Expected behavior**: What should happen
+5. **Actual behavior**: What actually happened
+6. **Screenshots**: If applicable
+7. **Environment**:
+   - Operating System:
+   - Node.js version:
+   - Project version:
 
-## اقتراح ميزات جديدة
+## Suggesting Features
 
-### قبل الاقتراح
+### Before Suggesting
 
-- تحقق من [Roadmap](CHANGELOG.md#قادم---roadmap)
-- ابحث في Issues الموجودة
+- Check the [Roadmap](CHANGELOG.md#coming-soon---roadmap)
+- Search existing issues
 
-### كيفية الاقتراح
+### How to Suggest
 
-افتح Issue جديد مع:
+Open a new Issue with:
 
-1. **العنوان**: اسم الميزة المقترحة
-2. **المشكلة**: ما المشكلة التي تحلها هذه الميزة؟
-3. **الحل المقترح**: كيف تتصور الميزة؟
-4. **البدائل**: هل فكرت في حلول أخرى؟
-5. **أمثلة**: كود توضيحي إن أمكن
+1. **Title**: Proposed feature name
+2. **Problem**: What problem does this feature solve?
+3. **Proposed solution**: How do you envision the feature?
+4. **Alternatives**: Have you considered other solutions?
+5. **Examples**: Sample code if applicable
 
-## إرشادات الكود
+## Code Guidelines
 
 ### JavaScript/Node.js
 
 ```javascript
-// ✅ جيد
+// ✅ Good
 /**
- * دالة لإرسال الإشعارات
- * @param {string} message - الرسالة المراد إرسالها
- * @param {object} options - خيارات إضافية
+ * Function to send notifications
+ * @param {string} message - Message to be sent
+ * @param {object} options - Additional options
  */
 async function sendNotification(message, options = {}) {
   try {
     const result = await notifier.send(message, options);
-    console.log('✅ تم الإرسال بنجاح');
+    console.log('✅ Sent successfully');
     return result;
   } catch (error) {
-    console.error('❌ خطأ في الإرسال:', error.message);
+    console.error('❌ Send error:', error.message);
     throw error;
   }
 }
 
-// ❌ سيء
+// ❌ Bad
 async function send(m,o){
   return await notifier.send(m,o)
 }
 ```
 
-### قواعد الكتابة
+### Writing Rules
 
-1. **التسمية**:
-   - استخدم `camelCase` للمتغيرات والدوال
-   - استخدم `PascalCase` للـ Classes
-   - استخدم `UPPER_CASE` للثوابت
+1. **Naming**:
+   - Use `camelCase` for variables and functions
+   - Use `PascalCase` for Classes
+   - Use `UPPER_CASE` for constants
 
-2. **التعليقات**:
-   - اكتب تعليقات مفيدة بالعربية
-   - استخدم JSDoc للدوال
-   - اشرح "لماذا" وليس "ماذا"
+2. **Comments**:
+   - Write helpful comments in English
+   - Use JSDoc for functions
+   - Explain "why", not "what"
 
-3. **معالجة الأخطاء**:
-   - استخدم try/catch دائماً
-   - سجل الأخطاء بوضوح
-   - لا تتجاهل الأخطاء
+3. **Error Handling**:
+   - Always use try/catch
+   - Log errors clearly
+   - Don't ignore errors
 
 4. **Async/Await**:
-   - استخدم async/await بدلاً من Promises
-   - تعامل مع الأخطاء بشكل صحيح
+   - Use async/await instead of Promises
+   - Handle errors properly
 
-5. **الكود النظيف**:
-   - دوال صغيرة ومحددة
-   - تجنب التكرار (DRY)
-   - اسماء واضحة ووصفية
+5. **Clean Code**:
+   - Small, focused functions
+   - Avoid repetition (DRY)
+   - Clear, descriptive names
 
-### اختبارات Playwright
+### Playwright Tests
 
 ```javascript
-// ✅ جيد
-test('يجب أن يعرض رسالة خطأ عند إدخال بيانات غير صحيحة', async ({ page }) => {
+// ✅ Good
+test('Should display error message with invalid credentials', async ({ page }) => {
   await page.goto('/login');
   await page.fill('[name="email"]', 'invalid@example.com');
   await page.fill('[name="password"]', 'wrongpassword');
   await page.click('button[type="submit"]');
   
   await expect(page.locator('.error-message')).toBeVisible();
-  await expect(page.locator('.error-message')).toContainText('بيانات غير صحيحة');
+  await expect(page.locator('.error-message')).toContainText('Invalid credentials');
 });
 
-// ❌ سيء
+// ❌ Bad
 test('test1', async ({ page }) => {
   await page.goto('/login');
   await page.click('button');
 });
 ```
 
-### اختبارات Appium
+### Appium Tests
 
 ```javascript
-// ✅ جيد
-it('يجب أن يعرض شاشة تسجيل الدخول بنجاح', async function() {
+// ✅ Good
+it('Should display login screen successfully', async function() {
   this.timeout(30000);
   
   const emailField = await driver.$('~email-input');
@@ -227,77 +227,77 @@ it('يجب أن يعرض شاشة تسجيل الدخول بنجاح', async fun
   expect(isDisplayed).toBe(true);
 });
 
-// ❌ سيء
+// ❌ Bad
 it('test', async function() {
   const e = await driver.$('~email');
   e.click();
 });
 ```
 
-## عملية المراجعة
+## Review Process
 
-### ما نبحث عنه
+### What We Look For
 
-✅ **نقبل**:
-- كود نظيف وقابل للقراءة
-- تعليقات واضحة
-- اختبارات تعمل
-- توثيق محدّث
-- يتبع الإرشادات
+✅ **We accept**:
+- Clean, readable code
+- Clear comments
+- Working tests
+- Updated documentation
+- Follows guidelines
 
-❌ **نرفض**:
-- كود غير مختبر
-- تغييرات كبيرة بدون نقاش
-- كسر الميزات الموجودة
-- بدون توثيق
+❌ **We reject**:
+- Untested code
+- Large changes without discussion
+- Breaking existing features
+- Without documentation
 
-### بعد فتح PR
+### After Opening PR
 
-1. سيتم مراجعة الكود خلال 48 ساعة
-2. قد نطلب تعديلات
-3. بعد الموافقة، سيتم الدمج
-4. شكراً لمساهمتك! 🎉
+1. Code will be reviewed within 48 hours
+2. We may request changes
+3. Once approved, it will be merged
+4. Thank you for your contribution! 🎉
 
-## أسئلة؟
+## Questions?
 
-إذا كان لديك أي أسئلة:
+If you have any questions:
 
-1. اقرأ [README.md](README.md)
-2. اقرأ [QUICKSTART.md](QUICKSTART.md)
-3. ابحث في [Issues](https://github.com/your-repo/issues)
-4. افتح Issue جديد
+1. Read [README.md](README.md)
+2. Read [QUICKSTART.md](QUICKSTART.md)
+3. Search in [Issues](https://github.com/your-repo/issues)
+4. Open a new issue
 
-## مدونة السلوك
+## Code of Conduct
 
-### تعهدنا
+### Our Pledge
 
-نحن ملتزمون بتوفير بيئة ترحيبية وآمنة للجميع.
+We are committed to providing a welcoming and safe environment for everyone.
 
-### المعايير
+### Standards
 
-✅ **سلوك إيجابي**:
-- الاحترام المتبادل
-- تقبل النقد البناء
-- التركيز على ما هو أفضل للمجتمع
-- إظهار التعاطف
+✅ **Positive behavior**:
+- Mutual respect
+- Accept constructive criticism
+- Focus on what's best for the community
+- Show empathy
 
-❌ **سلوك غير مقبول**:
-- التحرش أو الإساءة
-- التعليقات المهينة
-- الهجمات الشخصية
-- نشر معلومات خاصة
+❌ **Unacceptable behavior**:
+- Harassment or abuse
+- Insulting comments
+- Personal attacks
+- Publishing private information
 
-### الإنفاذ
+### Enforcement
 
-الانتهاكات سيتم التعامل معها بجدية وقد تؤدي إلى الحظر.
+Violations will be taken seriously and may result in being banned.
 
 ---
 
-## 🙏 شكراً
+## 🙏 Thank You
 
-شكراً لمساهمتك في جعل هذا المشروع أفضل!
+Thank you for contributing to making this project better!
 
-كل مساهمة، صغيرة أو كبيرة، تُحدث فرقاً. 💙
+Every contribution, small or large, makes a difference. 💙
 
 ---
 

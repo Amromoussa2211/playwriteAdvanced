@@ -1,24 +1,24 @@
-# 🚀 دليل البدء السريع
+# 🚀 Quick Start Guide
 
-## خطوات الإعداد في 5 دقائق
+## Setup Steps in 5 Minutes
 
-### 1️⃣ التثبيت
+### 1️⃣ Installation
 
 ```bash
-# استنساخ المشروع
+# Clone the project
 git clone <repository-url>
 cd test-automation-framework
 
-# التثبيت التلقائي
+# Automatic installation
 npm run setup
 ```
 
-### 2️⃣ تكوين البيئة
+### 2️⃣ Environment Configuration
 
-افتح ملف `.env` وأضف:
+Open `.env` file and add:
 
 ```env
-# الحد الأدنى المطلوب
+# Minimum required
 APP_URL=https://example.com
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK
 SMTP_HOST=smtp.gmail.com
@@ -28,56 +28,56 @@ SMTP_PASS=your-password
 EMAIL_TO=stakeholder@example.com
 ```
 
-### 3️⃣ تشغيل أول اختبار
+### 3️⃣ Run First Test
 
 ```bash
-# اختبار الويب
+# Web test
 npm run test:web
 
-# أو باستخدام Docker
+# Or using Docker
 npm run docker:test
 ```
 
 ---
 
-## 📝 الأوامر الأساسية
+## 📝 Basic Commands
 
-| الأمر | الوصف |
-|------|-------|
-| `npm run setup` | إعداد البيئة والتثبيت التلقائي |
-| `npm run test:web` | تشغيل اختبارات الويب |
-| `npm run test:mobile` | تشغيل اختبارات المحمول |
-| `npm run test:all` | تشغيل جميع الاختبارات |
-| `npm run report` | عرض تقرير Playwright |
-| `npm run docker:build` | بناء Docker images |
-| `npm run docker:test` | تشغيل الاختبارات في Docker |
+| Command | Description |
+|---------|-------------|
+| `npm run setup` | Environment setup and automatic installation |
+| `npm run test:web` | Run web tests |
+| `npm run test:mobile` | Run mobile tests |
+| `npm run test:all` | Run all tests |
+| `npm run report` | Show Playwright report |
+| `npm run docker:build` | Build Docker images |
+| `npm run docker:test` | Run tests in Docker |
 
 ---
 
-## 🎯 كتابة اختبار جديد
+## 🎯 Writing a New Test
 
-### اختبار ويب بسيط
+### Simple Web Test
 
-أنشئ `tests/web/my-test.spec.js`:
+Create `tests/web/my-test.spec.js`:
 
 ```javascript
 const { test, expect } = require('@playwright/test');
 
-test('اختبار الصفحة الرئيسية', async ({ page }) => {
+test('Homepage Test', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle(/الصفحة الرئيسية/);
+  await expect(page).toHaveTitle(/Homepage/);
 });
 ```
 
-### اختبار محمول بسيط
+### Simple Mobile Test
 
-أنشئ `tests/mobile/my-mobile-test.js`:
+Create `tests/mobile/my-mobile-test.js`:
 
 ```javascript
 const { remote } = require('webdriverio');
 const appiumConfig = require('../../config/appium.config');
 
-describe('اختبار بسيط', () => {
+describe('Simple Test', () => {
   let driver;
 
   before(async function() {
@@ -85,7 +85,7 @@ describe('اختبار بسيط', () => {
     driver = await remote(options);
   });
 
-  it('فتح التطبيق', async function() {
+  it('Launch App', async function() {
     const element = await driver.$('~button-id');
     await element.click();
   });
@@ -94,13 +94,13 @@ describe('اختبار بسيط', () => {
 
 ---
 
-## 🔧 إعداد GitHub Actions
+## 🔧 GitHub Actions Setup
 
-### 1. أضف Secrets في GitHub
+### 1. Add Secrets in GitHub
 
-انتقل إلى: `Settings > Secrets > Actions`
+Go to: `Settings > Secrets > Actions`
 
-أضف:
+Add:
 - `SLACK_WEBHOOK_URL`
 - `SMTP_HOST`
 - `SMTP_USER`
@@ -108,69 +108,69 @@ describe('اختبار بسيط', () => {
 - `EMAIL_TO`
 - `APP_URL`
 
-### 2. Push الكود
+### 2. Push Code
 
 ```bash
 git add .
-git commit -m "إضافة إطار الاختبار"
+git commit -m "Add test automation framework"
 git push
 ```
 
-### 3. مراقبة التشغيل
+### 3. Monitor Execution
 
-تابع في تبويب **Actions** على GitHub
+Follow in **Actions** tab on GitHub
 
 ---
 
-## 🐳 استخدام Docker
+## 🐳 Using Docker
 
-### البناء والتشغيل
+### Build and Run
 
 ```bash
-# بناء مرة واحدة
+# Build once
 docker-compose build
 
-# تشغيل الاختبارات
+# Run tests
 docker-compose up
 
-# تشغيل في الخلفية
+# Run in background
 docker-compose up -d
 
-# إيقاف
+# Stop
 docker-compose down
 ```
 
-### تشغيل خدمة معينة
+### Run specific service
 
 ```bash
-# الويب فقط
+# Web only
 docker-compose up playwright
 
-# المحمول فقط
+# Mobile only
 docker-compose up appium
 ```
 
 ---
 
-## 📱 إعداد اختبارات Android
+## 📱 Android Testing Setup
 
-### 1. تشغيل المحاكي
+### 1. Start Emulator
 
 ```bash
-# إنشاء محاكي
+# Create emulator
 avdmanager create avd -n test -k "system-images;android-33;google_apis;x86_64"
 
-# تشغيل
+# Run
 emulator -avd test
 ```
 
-### 2. تشغيل Appium
+### 2. Start Appium
 
 ```bash
 npx appium --address 0.0.0.0 --port 4723
 ```
 
-### 3. تشغيل الاختبارات
+### 3. Run Tests
 
 ```bash
 npm run test:mobile
@@ -178,39 +178,39 @@ npm run test:mobile
 
 ---
 
-## 🔔 تكوين Slack
+## 🔔 Slack Configuration
 
-### 1. إنشاء Webhook
+### 1. Create Webhook
 
-1. اذهب إلى: https://api.slack.com/messaging/webhooks
-2. اختر قناتك
-3. انسخ Webhook URL
+1. Go to: https://api.slack.com/messaging/webhooks
+2. Select your channel
+3. Copy Webhook URL
 
-### 2. أضفه للبيئة
+### 2. Add to Environment
 
 ```env
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00/B00/xxx
 ```
 
-### 3. اختبر الإرسال
+### 3. Test Sending
 
 ```bash
 node -e "
 const SlackNotifier = require('./utils/slack-notifier');
 const slack = new SlackNotifier();
-slack.sendMessage('اختبار! 🎉');
+slack.sendMessage('Test! 🎉');
 "
 ```
 
 ---
 
-## 📧 تكوين البريد الإلكتروني
+## 📧 Email Configuration
 
 ### Gmail
 
-1. فعّل التحقق بخطوتين
-2. أنشئ App Password: https://myaccount.google.com/apppasswords
-3. استخدمه في `.env`:
+1. Enable two-factor authentication
+2. Create App Password: https://myaccount.google.com/apppasswords
+3. Use it in `.env`:
 
 ```env
 SMTP_HOST=smtp.gmail.com
@@ -220,94 +220,94 @@ SMTP_PASS=xxxx-xxxx-xxxx-xxxx
 EMAIL_TO=recipient1@example.com,recipient2@example.com
 ```
 
-### SMTP آخر
+### Other SMTP
 
 ```env
 SMTP_HOST=mail.your-provider.com
-SMTP_PORT=587  # أو 465 للـ SSL
+SMTP_PORT=587  # or 465 for SSL
 SMTP_USER=username
 SMTP_PASS=password
 ```
 
 ---
 
-## 🐛 حل المشاكل الشائعة
+## 🐛 Common Troubleshooting
 
-### المتصفحات لا تعمل
+### Browsers not working
 
 ```bash
 npx playwright install --with-deps
 ```
 
-### Appium لا يتصل
+### Appium not connecting
 
 ```bash
-# تحقق من الأجهزة
+# Check devices
 adb devices
 
-# أعد تشغيل ADB
+# Restart ADB
 adb kill-server
 adb start-server
 
-# تحقق من Appium
+# Check Appium
 npx appium driver list
 npx appium driver install uiautomator2
 ```
 
-### Docker لا يعمل
+### Docker not working
 
 ```bash
-# أعد البناء
+# Rebuild
 docker-compose build --no-cache
 
-# نظف
+# Clean
 docker system prune -a
 
-# تحقق من الحاويات
+# Check containers
 docker ps -a
 ```
 
-### الإشعارات لا تُرسل
+### Notifications not sending
 
 ```bash
-# اختبر الاتصال
+# Test connection
 node -e "
 require('dotenv').config();
-console.log('SLACK_WEBHOOK_URL:', process.env.SLACK_WEBHOOK_URL ? '✅ موجود' : '❌ مفقود');
-console.log('SMTP_USER:', process.env.SMTP_USER ? '✅ موجود' : '❌ مفقود');
+console.log('SLACK_WEBHOOK_URL:', process.env.SLACK_WEBHOOK_URL ? '✅ exists' : '❌ missing');
+console.log('SMTP_USER:', process.env.SMTP_USER ? '✅ exists' : '❌ missing');
 "
 ```
 
 ---
 
-## 📊 قراءة التقارير
+## 📊 Reading Reports
 
 ### Playwright HTML Report
 
 ```bash
-# عرض التقرير
+# Show report
 npm run report
 
-# أو افتح يدوياً
+# Or open manually
 open playwright-report/index.html
 ```
 
-### لقطات الشاشة
+### Screenshots
 
-موجودة في: `test-results/`
+Located in: `test-results/`
 
 ### JSON Results
 
-موجودة في: `test-results/results.json`
+Located in: `test-results/results.json`
 
 ---
 
-## 🎓 أمثلة متقدمة
+## 🎓 Advanced Examples
 
-### اختبار API
+### API Testing
 
 ```javascript
-test('اختبار API', async ({ request }) => {
+test('API Test', async ({ request }) => {
   const response = await request.get('/api/users');
   expect(response.ok()).toBeTruthy();
   const data = await response.json();
@@ -315,19 +315,19 @@ test('اختبار API', async ({ request }) => {
 });
 ```
 
-### التقاط فيديو
+### Video Capture
 
 ```javascript
-test('مع فيديو', async ({ page }) => {
+test('With Video', async ({ page }) => {
   await page.goto('/');
-  // الفيديو يُسجل تلقائياً عند الفشل
+  // Video is automatically recorded on failure
 });
 ```
 
-### اختبار الأداء
+### Performance Testing
 
 ```javascript
-test('قياس الأداء', async ({ page }) => {
+test('Performance Measurement', async ({ page }) => {
   const start = Date.now();
   await page.goto('/');
   const loadTime = Date.now() - start;
@@ -337,7 +337,7 @@ test('قياس الأداء', async ({ page }) => {
 
 ---
 
-## 🔗 روابط مفيدة
+## 🔗 Useful Links
 
 - [Playwright Docs](https://playwright.dev/)
 - [Appium Docs](https://appium.io/)
@@ -346,23 +346,23 @@ test('قياس الأداء', async ({ page }) => {
 
 ---
 
-## 💡 نصائح سريعة
+## 💡 Quick Tips
 
-✅ **افعل:**
-- اكتب اختبارات مستقلة
-- استخدم Page Objects
-- اختبر السيناريوهات الحقيقية
-- نظف البيانات بعد الاختبار
+✅ **Do:**
+- Write independent tests
+- Use Page Objects
+- Test real scenarios
+- Clean data after testing
 
-❌ **لا تفعل:**
-- تخزين البيانات الحساسة في الكود
-- الاعتماد على ترتيب الاختبارات
-- استخدام `waitForTimeout` كثيراً
-- تجاهل الاختبارات الفاشلة
+❌ **Don't:**
+- Store sensitive data in code
+- Rely on test order
+- Use `waitForTimeout` too much
+- Ignore failed tests
 
 ---
 
-**جاهز للبدء؟** 🚀
+**Ready to Start?** 🚀
 
 ```bash
 npm run setup
