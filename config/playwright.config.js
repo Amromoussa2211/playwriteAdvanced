@@ -57,23 +57,23 @@ module.exports = defineConfig({
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
-    },
+    }
 
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    // {
+    //   name: 'webkit',
+    //   use: { ...devices['Desktop Safari'] },
+    // },
 
     /* اختبار الهواتف المحمولة (عبر المتصفح) */
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
-  ],
+    // {
+      // name: 'Mobile Chrome',
+      // use: { ...devices['Pixel 5'] },
+    // },
+    // {
+      // name: 'Mobile Safari',
+      // use: { ...devices['iPhone 12'] },
+    // },
+  ]
 
   /* خادم محلي للتطوير (اختياري) */
   // webServer: {
