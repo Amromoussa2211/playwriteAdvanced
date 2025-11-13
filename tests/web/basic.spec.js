@@ -12,3 +12,4 @@ test('اختبار أساسي 2 - التحقق من المحتوى', async ({ pa
   expect(content).toBeTruthy();
   console.log('✅ الاختبار 2 نجح');
 });
+//
