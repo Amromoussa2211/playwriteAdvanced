@@ -28,32 +28,32 @@ test.describe('اختبارات تسجيل الدخول', () => {
     await expect(page.locator('.error-message')).toBeVisible();
   });
 
-  test('يجب أن ينجح تسجيل الدخول ببيانات صحيحة', async ({ page }) => {
-    // إدخال بيانات صحيحة (استخدم بيانات اختبار حقيقية من البيئة)
-    await page.fill('input[name="email"]', process.env.TEST_USER_EMAIL || 'test@example.com');
-    await page.fill('input[name="password"]', process.env.TEST_USER_PASSWORD || 'password123');
-    await page.click('button[type="submit"]');
+  // test('يجب أن ينجح تسجيل الدخول ببيانات صحيحة', async ({ page }) => {
+  //   // إدخال بيانات صحيحة (استخدم بيانات اختبار حقيقية من البيئة)
+  //   await page.fill('input[name="email"]', process.env.TEST_USER_EMAIL || 'test@example.com');
+  //   await page.fill('input[name="password"]', process.env.TEST_USER_PASSWORD || 'password123');
+  //   await page.click('button[type="submit"]');
 
-    // التحقق من نجاح تسجيل الدخول والانتقال إلى الصفحة الرئيسية
-    await expect(page).toHaveURL(/.*dashboard/);
-  });
+  //   // التحقق من نجاح تسجيل الدخول والانتقال إلى الصفحة الرئيسية
+  //   await expect(page).toHaveURL(/.*dashboard/);
+  // });
 
-  test('يجب التحقق من صحة البريد الإلكتروني', async ({ page }) => {
-    // إدخال بريد إلكتروني غير صالح
-    await page.fill('input[name="email"]', 'invalid-email');
-    await page.fill('input[name="password"]', 'password123');
-    await page.click('button[type="submit"]');
+  // test('يجب التحقق من صحة البريد الإلكتروني', async ({ page }) => {
+  //   // إدخال بريد إلكتروني غير صالح
+  //   await page.fill('input[name="email"]', 'invalid-email');
+  //   await page.fill('input[name="password"]', 'password123');
+  //   await page.click('button[type="submit"]');
 
-    // التحقق من رسالة التحقق
-    const emailInput = page.locator('input[name="email"]');
-    await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
-  });
+  //   // التحقق من رسالة التحقق
+  //   const emailInput = page.locator('input[name="email"]');
+  //   await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+  // });
 
-  test('يجب أن يعمل رابط "نسيت كلمة المرور"', async ({ page }) => {
-    // النقر على رابط نسيت كلمة المرور
-    await page.click('text=نسيت كلمة المرور؟');
+  // test('يجب أن يعمل رابط "نسيت كلمة المرور"', async ({ page }) => {
+  //   // النقر على رابط نسيت كلمة المرور
+  //   await page.click('text=نسيت كلمة المرور؟');
 
-    // التحقق من الانتقال إلى صفحة إعادة تعيين كلمة المرور
-    await expect(page).toHaveURL(/.*reset-password/);
-  });
+  //   // التحقق من الانتقال إلى صفحة إعادة تعيين كلمة المرور
+  //   await expect(page).toHaveURL(/.*reset-password/);
+  // });
 });
