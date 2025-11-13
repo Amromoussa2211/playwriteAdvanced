@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "setup": "node scripts/setup.js",
-    "test:web": "playwright test --config=config/playwright.config.js",
+    "test:web": "playwright test --config=config/playwright.config.js --reporter=line",
     "test:mobile": "node tests/mobile/runner.js",
     "test:all": "npm run test:web && npm run test:mobile",
     "test:parallel": "npm run test:web & npm run test:mobile",
