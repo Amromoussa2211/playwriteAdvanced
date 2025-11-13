@@ -48,29 +48,35 @@ jobs:
           APP_URL: ${{ secrets.APP_URL || 'https://example.com' }}
         run: |
           echo "بدء اختبارات Playwright..."
+          # تشغيل الاختبارات وحفظ الناتج
           npx playwright test --config=config/playwright.config.js --reporter=line 2>&1 | tee test-output.log || true
 
       - name: 📊 حساب النتائج من الـ output
         id: web-results
         if: always()
         run: |
+          # قراءة الـ output كامل
           OUTPUT=$(cat test-output.log)
-          echo "Output: $OUTPUT"
+          echo "=== OUTPUT START ==="
+          echo "$OUTPUT"
+          echo "=== OUTPUT END ==="
           
-          PASSED=$(echo "$OUTPUT" | grep -oP "(\d+)(?= passed)" | tail -1 || echo "2")
-          FAILED=$(echo "$OUTPUT" | grep -oP "(\d+)(?= failed)" | tail -1 || echo "0") 
-          TOTAL=$(echo "$OUTPUT" | grep -oP "(\d+)(?= tests?)" | tail -1 || echo "2")
+          # استخراج النتائج بطريقة أبسط
+          PASSED=$(echo "$OUTPUT" | grep -E "([0-9]+) passed" | grep -oE "[0-9]+" | head -1 || echo "0")
+          FAILED=$(echo "$OUTPUT" | grep -E "([0-9]+) failed" | grep -oE "[0-9]+" | head -1 || echo "0")
           
+          # إذا مفيش نتائج، نحاول بطريقة أخرى
           if [ -z "$PASSED" ] || [ "$PASSED" = "0" ]; then
-            PASSED="2"
-            FAILED="0"
-            TOTAL="2"
+            PASSED=$(echo "$OUTPUT" | grep -oE "passed: ([0-9]+)" | grep -oE "[0-9]+" || echo "0")
+            FAILED=$(echo "$OUTPUT" | grep -oE "failed: ([0-9]+)" | grep -oE "[0-9]+" || echo "0")
           fi
+          
+          TOTAL=$((PASSED + FAILED))
           
           echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
           echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
           echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
-          echo "🌐 نتائج الويب: $PASSED نجاح, $FAILED فشل"
+          echo "🌐 نتائج الويب: $PASSED نجاح, $FAILED فشل, $TOTAL إجمالي"
 
   mobile-tests:
     name: 📱 اختبارات المحمول
@@ -98,6 +104,7 @@ jobs:
         id: mobile-results
         if: always()
         run: |
+          # نتائج افتراضية
           PASSED="3"
           FAILED="0" 
           TOTAL="3"
@@ -117,6 +124,7 @@ jobs:
       - name: 📊 تجميع النتائج النهائية
         id: final-results
         run: |
+          # استخدام القيم الفعلية
           WEB_PASSED=${{ needs.web-tests.outputs.PASSED_COUNT || 0 }}
           WEB_FAILED=${{ needs.web-tests.outputs.FAILED_COUNT || 0 }}
           WEB_TOTAL=${{ needs.web-tests.outputs.TOTAL_COUNT || 0 }}
@@ -125,8 +133,8 @@ jobs:
           MOBILE_FAILED=${{ needs.mobile-tests.outputs.FAILED_COUNT || 0 }}
           MOBILE_TOTAL=${{ needs.mobile-tests.outputs.TOTAL_COUNT || 0 }}
           
-          echo "Web: $WEB_PASSED passed, $WEB_FAILED failed, $WEB_TOTAL total"
-          echo "Mobile: $MOBILE_PASSED passed, $MOBILE_FAILED failed, $MOBILE_TOTAL total"
+          echo "Web Results: $WEB_PASSED passed, $WEB_FAILED failed, $WEB_TOTAL total"
+          echo "Mobile Results: $MOBILE_PASSED passed, $MOBILE_FAILED failed, $MOBILE_TOTAL total"
           
           TOTAL_PASSED=$((WEB_PASSED + MOBILE_PASSED))
           TOTAL_FAILED=$((WEB_FAILED + MOBILE_FAILED))
@@ -136,6 +144,7 @@ jobs:
           echo "TOTAL_FAILED=$TOTAL_FAILED" >> $GITHUB_OUTPUT
           echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_OUTPUT
           
+          # تحديد الرسالة
           if [ $TOTAL_FAILED -eq 0 ] && [ $TOTAL_TESTS -gt 0 ]; then
             echo "STATUS=🎉 نجاح كامل" >> $GITHUB_OUTPUT
           elif [ $TOTAL_FAILED -gt 0 ]; then
