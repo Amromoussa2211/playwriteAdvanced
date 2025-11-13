@@ -41,7 +41,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # إزالة cache تماماً
+          # إزالة cache تماماً - هذا هو الحل
 
       - name: 📦 Install dependencies
         run: npm install
@@ -109,7 +109,6 @@ jobs:
           echo "📱 اختبارات المحمول: ${{ needs.mobile-tests.result }}"
           echo "======================================"
           echo "✅ Workflow اكتمل بنجاح!"
-          
 # name: 🧪 Test Automation CI/CD
 
 # on:
