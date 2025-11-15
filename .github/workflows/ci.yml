@@ -1,247 +1,248 @@
-name: 🧪 Test Automation CI/CD
+# name: 🧪 Test Automation CI/CD
 
-on:
-  push:
-    branches: [ main, develop, master ]
-  pull_request:
-    branches: [ main, develop, master ]
-  # schedule:
-  #   - cron: '0 2 * * *'
-  workflow_dispatch:
-    inputs:
-      test_type:
-        description: 'Test type to run'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - web
-          - mobile
+# on:
+#   push:
+#     branches: [ main, develop, master ]
+#   pull_request:
+#     branches: [ main, develop, master ]
+#   # schedule:
+#   #   - cron: '0 2 * * *'
+#   workflow_dispatch:
+#     inputs:
+#       test_type:
+#         description: 'Test type to run'
+#         required: true
+#         default: 'all'
+#         type: choice
+#         options:
+#           - all
+#           - web
+#           - mobile
 
-env:
-  NODE_VERSION: '18'
+# env:
+#   NODE_VERSION: '18'
 
-jobs:
-  web-tests:
-    name: 🌐 Web Tests
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
-    outputs:
-      PASSED_COUNT: ${{ steps.web-results.outputs.PASSED_COUNT }}
-      FAILED_COUNT: ${{ steps.web-results.outputs.FAILED_COUNT }}
-      TOTAL_COUNT: ${{ steps.web-results.outputs.TOTAL_COUNT }}
+# jobs:
+#   web-tests:
+#     name: 🌐 Web Tests
+#     runs-on: ubuntu-latest
+#     if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+#     outputs:
+#       PASSED_COUNT: ${{ steps.web-results.outputs.PASSED_COUNT }}
+#       FAILED_COUNT: ${{ steps.web-results.outputs.FAILED_COUNT }}
+#       TOTAL_COUNT: ${{ steps.web-results.outputs.TOTAL_COUNT }}
     
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
+#     steps:
+#       - name: 📥 Checkout code
+#         uses: actions/checkout@v4
 
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+#       - name: 🔧 Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: ${{ env.NODE_VERSION }}
 
-      - name: 📦 Install dependencies
-        run: npm install
+#       - name: 📦 Install dependencies
+#         run: npm install
 
-      - name: 🎭 Install Playwright
-        run: npx playwright install
+#       - name: 🎭 Install Playwright
+#         run: npx playwright install
 
-      - name: 🧪 Run Playwright tests
-        env:
-          APP_URL: ${{ secrets.APP_URL || 'https://example.com' }}
-        run: |
-          echo "Starting Playwright tests..."
-          npx playwright test --config=config/playwright.config.js --reporter=line 2>&1 | tee test-output.log || true
+#       - name: 🧪 Run Playwright tests
+#         env:
+#           APP_URL: ${{ secrets.APP_URL || 'https://example.com' }}
+#         run: |
+#           echo "Starting Playwright tests..."
+#           npx playwright test --config=config/playwright.config.js --reporter=line 2>&1 | tee test-output.log || true
 
-      - name: 📊 Parse Web Test Results
-        id: web-results
-        if: always()
-        run: |
-          OUTPUT=$(cat test-output.log)
-          echo "=== TEST OUTPUT START ==="
-          echo "$OUTPUT"
-          echo "=== TEST OUTPUT END ==="
+#       - name: 📊 Parse Web Test Results
+#         id: web-results
+#         if: always()
+#         run: |
+#           OUTPUT=$(cat test-output.log)
+#           echo "=== TEST OUTPUT START ==="
+#           echo "$OUTPUT"
+#           echo "=== TEST OUTPUT END ==="
 
-          PASSED=$(echo "$OUTPUT" | grep -E "([0-9]+) passed" | grep -oE "[0-9]+" | head -1 || echo "0")
-          FAILED=$(echo "$OUTPUT" | grep -E "([0-9]+) failed" | grep -oE "[0-9]+" | head -1 || echo "0")
+#           PASSED=$(echo "$OUTPUT" | grep -E "([0-9]+) passed" | grep -oE "[0-9]+" | head -1 || echo "0")
+#           FAILED=$(echo "$OUTPUT" | grep -E "([0-9]+) failed" | grep -oE "[0-9]+" | head -1 || echo "0")
 
-          if [ -z "$PASSED" ] || [ "$PASSED" = "" ]; then PASSED=0; fi
-          if [ -z "$FAILED" ] || [ "$FAILED" = "" ]; then FAILED=0; fi
+#           if [ -z "$PASSED" ] || [ "$PASSED" = "" ]; then PASSED=0; fi
+#           if [ -z "$FAILED" ] || [ "$FAILED" = "" ]; then FAILED=0; fi
 
-          TOTAL=$((PASSED + FAILED))
+#           TOTAL=$((PASSED + FAILED))
 
-          echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
-          echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
-          echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
+#           echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
+#           echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
+#           echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
           
-          echo "🌐 Web Test Results: $PASSED passed, $FAILED failed, $TOTAL total"
+#           echo "🌐 Web Test Results: $PASSED passed, $FAILED failed, $TOTAL total"
 
-  mobile-tests:
-    name: 📱 Mobile Tests
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.test_type == 'mobile' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
-    outputs:
-      PASSED_COUNT: ${{ steps.mobile-results.outputs.PASSED_COUNT }}
-      FAILED_COUNT: ${{ steps.mobile-results.outputs.FAILED_COUNT }}
-      TOTAL_COUNT: ${{ steps.mobile-results.outputs.TOTAL_COUNT }}
+#   mobile-tests:
+#     name: 📱 Mobile Tests
+#     runs-on: ubuntu-latest
+#     if: ${{ github.event.inputs.test_type == 'mobile' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+#     outputs:
+#       PASSED_COUNT: ${{ steps.mobile-results.outputs.PASSED_COUNT }}
+#       FAILED_COUNT: ${{ steps.mobile-results.outputs.FAILED_COUNT }}
+#       TOTAL_COUNT: ${{ steps.mobile-results.outputs.TOTAL_COUNT }}
     
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
+#     steps:
+#       - name: 📥 Checkout code
+#         uses: actions/checkout@v4
 
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+#       - name: 🔧 Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: ${{ env.NODE_VERSION }}
 
-      - name: 📦 Install dependencies
-        run: npm install
+#       - name: 📦 Install dependencies
+#         run: npm install
 
-      - name: 🧪 Run Mobile tests
-        run: |
-          echo "Starting mobile tests..."
-          npm run test:mobile 2>&1 | tee mobile-output.log || true
+#       - name: 🧪 Run Mobile tests
+#         run: |
+#           echo "Starting mobile tests..."
+#           npm run test:mobile 2>&1 | tee mobile-output.log || true
 
-      - name: 📊 Parse Mobile Test Results
-        id: mobile-results
-        if: always()
-        run: |
-          # Example placeholder values
-          PASSED="3"
-          FAILED="0"
-          TOTAL="3"
+#       - name: 📊 Parse Mobile Test Results
+#         id: mobile-results
+#         if: always()
+#         run: |
+#           # Example placeholder values
+#           PASSED="3"
+#           FAILED="0"
+#           TOTAL="3"
 
-          echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
-          echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
-          echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
+#           echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
+#           echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
+#           echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
           
-          echo "📱 Mobile Test Results: $PASSED passed, $FAILED failed, $TOTAL total"
+#           echo "📱 Mobile Test Results: $PASSED passed, $FAILED failed, $TOTAL total"
 
-  slack-results:
-    name: 📢 Slack Notification
-    runs-on: ubuntu-latest
-    needs: [web-tests, mobile-tests]
-    if: always()
+#   slack-results:
+#     name: 📢 Slack Notification
+#     runs-on: ubuntu-latest
+#     needs: [web-tests, mobile-tests]
+#     if: always()
     
-    steps:
-      - name: 📊 Combine Final Results
-        id: final-results
-        run: |
-          WEB_PASSED=${{ needs.web-tests.outputs.PASSED_COUNT || 0 }}
-          WEB_FAILED=${{ needs.web-tests.outputs.FAILED_COUNT || 0 }}
-          WEB_TOTAL=${{ needs.web-tests.outputs.TOTAL_COUNT || 0 }}
+#     steps:
+#       - name: 📊 Combine Final Results
+#         id: final-results
+#         run: |
+#           WEB_PASSED=${{ needs.web-tests.outputs.PASSED_COUNT || 0 }}
+#           WEB_FAILED=${{ needs.web-tests.outputs.FAILED_COUNT || 0 }}
+#           WEB_TOTAL=${{ needs.web-tests.outputs.TOTAL_COUNT || 0 }}
           
-          MOBILE_PASSED=${{ needs.mobile-tests.outputs.PASSED_COUNT || 0 }}
-          MOBILE_FAILED=${{ needs.mobile-tests.outputs.FAILED_COUNT || 0 }}
-          MOBILE_TOTAL=${{ needs.mobile-tests.outputs.TOTAL_COUNT || 0 }}
+#           MOBILE_PASSED=${{ needs.mobile-tests.outputs.PASSED_COUNT || 0 }}
+#           MOBILE_FAILED=${{ needs.mobile-tests.outputs.FAILED_COUNT || 0 }}
+#           MOBILE_TOTAL=${{ needs.mobile-tests.outputs.TOTAL_COUNT || 0 }}
           
-          echo "Web Results: $WEB_PASSED passed, $WEB_FAILED failed, $WEB_TOTAL total"
-          echo "Mobile Results: $MOBILE_PASSED passed, $MOBILE_FAILED failed, $MOBILE_TOTAL total"
+#           echo "Web Results: $WEB_PASSED passed, $WEB_FAILED failed, $WEB_TOTAL total"
+#           echo "Mobile Results: $MOBILE_PASSED passed, $MOBILE_FAILED failed, $MOBILE_TOTAL total"
 
-          TOTAL_PASSED=$((WEB_PASSED + MOBILE_PASSED))
-          TOTAL_FAILED=$((WEB_FAILED + MOBILE_FAILED))
-          TOTAL_TESTS=$((TOTAL_PASSED + TOTAL_FAILED))
+#           TOTAL_PASSED=$((WEB_PASSED + MOBILE_PASSED))
+#           TOTAL_FAILED=$((WEB_FAILED + MOBILE_FAILED))
+#           TOTAL_TESTS=$((TOTAL_PASSED + TOTAL_FAILED))
           
-          echo "TOTAL_PASSED=$TOTAL_PASSED" >> $GITHUB_OUTPUT
-          echo "TOTAL_FAILED=$TOTAL_FAILED" >> $GITHUB_OUTPUT
-          echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+#           echo "TOTAL_PASSED=$TOTAL_PASSED" >> $GITHUB_OUTPUT
+#           echo "TOTAL_FAILED=$TOTAL_FAILED" >> $GITHUB_OUTPUT
+#           echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_OUTPUT
           
-          if [ $TOTAL_FAILED -eq 0 ] && [ $TOTAL_TESTS -gt 0 ]; then
-            echo "STATUS=🎉 All tests passed" >> $GITHUB_OUTPUT
-          elif [ $TOTAL_FAILED -gt 0 ]; then
-            echo "STATUS=⚠️ Some tests failed" >> $GITHUB_OUTPUT
-          else
-            echo "STATUS=🔧 No tests executed" >> $GITHUB_OUTPUT
-          fi
+#           if [ $TOTAL_FAILED -eq 0 ] && [ $TOTAL_TESTS -gt 0 ]; then
+#             echo "STATUS=🎉 All tests passed" >> $GITHUB_OUTPUT
+#           elif [ $TOTAL_FAILED -gt 0 ]; then
+#             echo "STATUS=⚠️ Some tests failed" >> $GITHUB_OUTPUT
+#           else
+#             echo "STATUS=🔧 No tests executed" >> $GITHUB_OUTPUT
+#           fi
 
-      - name: 📤 Send Slack Report
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          payload: |
-            {
-              "text": "🧪 Test Report - ${{ github.repository }}\n\n✅ ${{ steps.final-results.outputs.TOTAL_PASSED }} Passed | ❌ ${{ steps.final-results.outputs.TOTAL_FAILED }} Failed | 📋 ${{ steps.final-results.outputs.TOTAL_TESTS }} Total",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text", 
-                    "text": "🧪 Automated Test Report",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Repository:*\n${{ github.repository }}"
-                    },
-                    {
-                      "type": "mrkdwn", 
-                      "text": "*Branch:*\n${{ github.ref_name }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Status:*\n${{ steps.final-results.outputs.STATUS }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Triggered by:*\n${{ github.actor }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "divider"
-                },
-                {
-                  "type": "section", 
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*📊 Detailed Results:*"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*🌐 Web Tests:*\n✅ ${{ needs.web-tests.outputs.PASSED_COUNT }} Passed\n❌ ${{ needs.web-tests.outputs.FAILED_COUNT }} Failed\n📋 ${{ needs.web-tests.outputs.TOTAL_COUNT }} Total"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*📱 Mobile Tests:*\n✅ ${{ needs.mobile-tests.outputs.PASSED_COUNT }} Passed\n❌ ${{ needs.mobile-tests.outputs.FAILED_COUNT }} Failed\n📋 ${{ needs.mobile-tests.outputs.TOTAL_COUNT }} Total"
-                    }
-                  ]
-                },
-                {
-                  "type": "section", 
-                  "fields": [
-                    {
-                      "type": "mrkdwn", 
-                      "text": "*🏆 Overall:*\n✅ ${{ steps.final-results.outputs.TOTAL_PASSED }} Passed\n❌ ${{ steps.final-results.outputs.TOTAL_FAILED }} Failed\n📋 ${{ steps.final-results.outputs.TOTAL_TESTS }} Total"
-                    }
-                  ]
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "📊 View Report",
-                        "emoji": true
-                      },
-                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                      "style": "primary"
-                    }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+#       - name: 📤 Send Slack Report
+#         uses: slackapi/slack-github-action@v1.24.0
+#         with:
+#           payload: |
+#             {
+#               "text": "🧪 Test Report - ${{ github.repository }}\n\n✅ ${{ steps.final-results.outputs.TOTAL_PASSED }} Passed | ❌ ${{ steps.final-results.outputs.TOTAL_FAILED }} Failed | 📋 ${{ steps.final-results.outputs.TOTAL_TESTS }} Total",
+#               "blocks": [
+#                 {
+#                   "type": "header",
+#                   "text": {
+#                     "type": "plain_text", 
+#                     "text": "🧪 Automated Test Report",
+#                     "emoji": true
+#                   }
+#                 },
+#                 {
+#                   "type": "section",
+#                   "fields": [
+#                     {
+#                       "type": "mrkdwn",
+#                       "text": "*Repository:*\n${{ github.repository }}"
+#                     },
+#                     {
+#                       "type": "mrkdwn", 
+#                       "text": "*Branch:*\n${{ github.ref_name }}"
+#                     },
+#                     {
+#                       "type": "mrkdwn",
+#                       "text": "*Status:*\n${{ steps.final-results.outputs.STATUS }}"
+#                     },
+#                     {
+#                       "type": "mrkdwn",
+#                       "text": "*Triggered by:*\n${{ github.actor }}"
+#                     }
+#                   ]
+#                 },
+#                 {
+#                   "type": "divider"
+#                 },
+#                 {
+#                   "type": "section", 
+#                   "text": {
+#                     "type": "mrkdwn",
+#                     "text": "*📊 Detailed Results:*"
+#                   }
+#                 },
+#                 {
+#                   "type": "section",
+#                   "fields": [
+#                     {
+#                       "type": "mrkdwn",
+#                       "text": "*🌐 Web Tests:*\n✅ ${{ needs.web-tests.outputs.PASSED_COUNT }} Passed\n❌ ${{ needs.web-tests.outputs.FAILED_COUNT }} Failed\n📋 ${{ needs.web-tests.outputs.TOTAL_COUNT }} Total"
+#                     },
+#                     {
+#                       "type": "mrkdwn",
+#                       "text": "*📱 Mobile Tests:*\n✅ ${{ needs.mobile-tests.outputs.PASSED_COUNT }} Passed\n❌ ${{ needs.mobile-tests.outputs.FAILED_COUNT }} Failed\n📋 ${{ needs.mobile-tests.outputs.TOTAL_COUNT }} Total"
+#                     }
+#                   ]
+#                 },
+#                 {
+#                   "type": "section", 
+#                   "fields": [
+#                     {
+#                       "type": "mrkdwn", 
+#                       "text": "*🏆 Overall:*\n✅ ${{ steps.final-results.outputs.TOTAL_PASSED }} Passed\n❌ ${{ steps.final-results.outputs.TOTAL_FAILED }} Failed\n📋 ${{ steps.final-results.outputs.TOTAL_TESTS }} Total"
+#                     }
+#                   ]
+#                 },
+#                 {
+#                   "type": "actions",
+#                   "elements": [
+#                     {
+#                       "type": "button",
+#                       "text": {
+#                         "type": "plain_text",
+#                         "text": "📊 View Report",
+#                         "emoji": true
+#                       },
+#                       "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+#                       "style": "primary"
+#                     }
+#                   ]
+#                 }
+#               ]
+#             }
+#         env:
+#           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+//////////////////////////////////////////////
 
 # name: 🧪 Test Automation CI/CD
 
