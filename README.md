@@ -423,7 +423,7 @@ This project is licensed under the MIT License
 
 ## 👨‍💻 Author
 
-**MiniMax Agent**
+**AMR IBrahem Moussa  01143236791 || Amro_kaza@hotmail.com**
 
 ---
 
