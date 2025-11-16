@@ -44,6 +44,11 @@ jobs:
         env:
           CI: true
 
+      - name: Get commit SHA
+        id: sha
+        run: |
+          echo "short_sha=$(echo ${{ github.sha }} | cut -c1-8)" >> $GITHUB_OUTPUT
+
       - name: Parse test results
         id: parse-results
         run: |
@@ -91,7 +96,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*Commit:* ${{ github.sha.substring(0, 8) }}"
+                      "text": "*Commit:* ${{ steps.sha.outputs.short_sha }}"
                     },
                     {
                       "type": "mrkdwn",
