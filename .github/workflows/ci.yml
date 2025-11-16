@@ -197,27 +197,11 @@ jobs:
             echo "SLACK_TEXT=$SLACK_CONTENT" >> "$GITHUB_OUTPUT"
           else
             # Create default content if artifact wasn't found
-            cat > slack_tests_fallback.txt << 'EOF'
-⚠️ Test summary not available.
-
-🧪 *Test Summary*
-
-*Web Tests:*
-- Passed: PASSED_COUNT_PLACEHOLDER
-- Failed: FAILED_COUNT_PLACEHOLDER
-
-*Mobile Tests:*
-- Passed: MOBILE_PASSED_COUNT_PLACEHOLDER
-- Failed: MOBILE_FAILED_COUNT_PLACEHOLDER
-
-📊 Check the workflow logs for detailed results.
-EOF
-            
-            # Replace placeholders with actual values
-            sed -i "s/PASSED_COUNT_PLACEHOLDER/${{ needs.web-tests.outputs.PASSED_COUNT || '0' }}/g" slack_tests_fallback.txt
-            sed -i "s/FAILED_COUNT_PLACEHOLDER/${{ needs.web-tests.outputs.FAILED_COUNT || '0' }}/g" slack_tests_fallback.txt
-            sed -i "s/MOBILE_PASSED_COUNT_PLACEHOLDER/${{ needs.mobile-tests.outputs.PASSED_COUNT || '0' }}/g" slack_tests_fallback.txt
-            sed -i "s/MOBILE_FAILED_COUNT_PLACEHOLDER/${{ needs.mobile-tests.outputs.FAILED_COUNT || '0' }}/g" slack_tests_fallback.txt
+            printf "⚠️ Test summary not available.\\n\\n🧪 Test Summary\\n\\n*Web Tests:*\\n- Passed: %s\\n- Failed: %s\\n\\n*Mobile Tests:*\\n- Passed: %s\\n- Failed: %s\\n\\n📊 Check the workflow logs for detailed results." \
+              "${{ needs.web-tests.outputs.PASSED_COUNT || '0' }}" \
+              "${{ needs.web-tests.outputs.FAILED_COUNT || '0' }}" \
+              "${{ needs.mobile-tests.outputs.PASSED_COUNT || '0' }}" \
+              "${{ needs.mobile-tests.outputs.FAILED_COUNT || '0' }}" > slack_tests_fallback.txt
             
             # Escape the content for JSON
             SLACK_CONTENT=$(cat slack_tests_fallback.txt | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
