@@ -50,7 +50,7 @@ jobs:
           APP_URL: ${{ secrets.APP_URL || 'https://example.com' }}
         run: |
           echo "Starting Playwright tests..."
-          npx playwright test --config=config/playwright.config.js --reporter=line 2>&1 | tee test-output.log || true
+          npx playwright test --config=config/playwright.config.js 2>&1 | tee test-output.log || true
 
       - name: 📊 Parse Web Test Results
         id: web-results
@@ -71,7 +71,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report
+          path: ./playwright-report
+          if-no-files-found: warn
 
       - name: 📝 Generate Slack Test Summary
         if: always()
@@ -83,7 +84,7 @@ jobs:
           const reportPath = 'test-results/results.json';
 
           if (!fs.existsSync(reportPath)) {
-            fs.writeFileSync('slack_tests.txt', "⚠️ No results.json file was generated.");
+            fs.writeFileSync('slack_tests.txt', "⚠️ No results.json file was generated.\nHTML report: playwright-report/");
             process.exit(0);
           }
 
@@ -179,9 +180,11 @@ jobs:
       - name: 📥 Load Slack Test Summary
         id: load-tests
         run: |
-          echo "SLACK_TEXT<<EOF" >> $GITHUB_OUTPUT
-          cat slack_tests.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "SLACK_TEXT<<EOF"
+            cat slack_tests.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: 📤 Send Slack Report
         uses: slackapi/slack-github-action@v1.24.0
