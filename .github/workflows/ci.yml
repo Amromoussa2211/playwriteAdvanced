@@ -29,6 +29,8 @@ jobs:
       PASSED_COUNT: ${{ steps.web-results.outputs.PASSED_COUNT }}
       FAILED_COUNT: ${{ steps.web-results.outputs.FAILED_COUNT }}
       TOTAL_COUNT: ${{ steps.web-results.outputs.TOTAL_COUNT }}
+      PASSED_TESTS: ${{ steps.web-results.outputs.PASSED_TESTS }}
+      FAILED_TESTS: ${{ steps.web-results.outputs.FAILED_TESTS }}
     
     steps:
       - name: 📥 Checkout code
@@ -69,24 +71,16 @@ jobs:
           
           if [ -n "$REPORT_FILE" ] && [ -f "$REPORT_FILE" ]; then
             # Extract test names and counts from JSON
-            PASSED_TESTS=$(jq -r '.suites[]?.tests[]? | select(.status == "passed") | .title' "$REPORT_FILE" 2>/dev/null | paste -sd "|" - || echo "")
-            FAILED_TESTS=$(jq -r '.suites[]?.tests[]? | select(.status == "failed") | .title' "$REPORT_FILE" 2>/dev/null | paste -sd "|" - || echo "")
+            PASSED_TESTS=$(jq -r '.suites[]?.tests[]? | select(.status == "passed") | .title' "$REPORT_FILE" 2>/dev/null | paste -sd " " - || echo "")
+            FAILED_TESTS=$(jq -r '.suites[]?.tests[]? | select(.status == "failed") | .title' "$REPORT_FILE" 2>/dev/null | paste -sd " " - || echo "")
             PASSED_COUNT=$(jq -r '[.suites[]?.tests[]?] | map(select(.status == "passed")) | length' "$REPORT_FILE" 2>/dev/null || echo "0")
             FAILED_COUNT=$(jq -r '[.suites[]?.tests[]?] | map(select(.status == "failed")) | length' "$REPORT_FILE" 2>/dev/null || echo "0")
           else
-            # Fallback: parse from HTML report if available
-            if [ -d "playwright-report" ]; then
-              PASSED_COUNT=$(find playwright-report -name "*.html" -exec grep -o "passed" {} \; | wc -l || echo "0")
-              FAILED_COUNT=$(find playwright-report -name "*.html" -exec grep -o "failed" {} \; | wc -l || echo "0")
-              PASSED_TESTS="Check HTML report for details"
-              FAILED_TESTS="Check HTML report for details"
-            else
-              # Fallback: use example values
-              PASSED_COUNT="0"
-              FAILED_COUNT="0"
-              PASSED_TESTS="No tests executed"
-              FAILED_TESTS="No tests executed"
-            fi
+            # Fallback: use example values
+            PASSED_COUNT="0"
+            FAILED_COUNT="0"
+            PASSED_TESTS="Check detailed report for test names"
+            FAILED_TESTS="Check detailed report for test names"
           fi
           
           if [ -z "$PASSED_COUNT" ] || [ "$PASSED_COUNT" = "" ]; then PASSED_COUNT=0; fi
@@ -112,6 +106,8 @@ jobs:
       PASSED_COUNT: ${{ steps.mobile-results.outputs.PASSED_COUNT }}
       FAILED_COUNT: ${{ steps.mobile-results.outputs.FAILED_COUNT }}
       TOTAL_COUNT: ${{ steps.mobile-results.outputs.TOTAL_COUNT }}
+      PASSED_TESTS: ${{ steps.mobile-results.outputs.PASSED_TESTS }}
+      FAILED_TESTS: ${{ steps.mobile-results.outputs.FAILED_TESTS }}
     
     steps:
       - name: 📥 Checkout code
@@ -137,13 +133,15 @@ jobs:
           # Use example values for mobile tests (customize as needed)
           PASSED_COUNT="3"
           FAILED_COUNT="0"
-          PASSED_TESTS="Mobile login test|Mobile registration test|Profile update test"
+          PASSED_TESTS="Mobile login test Mobile registration test Profile update test"
           FAILED_TESTS="No mobile tests failed"
           TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
           
           echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_OUTPUT
           echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_OUTPUT
           echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_OUTPUT
+          echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_OUTPUT
+          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_OUTPUT
           
           echo "📱 Mobile Test Results: $PASSED_COUNT passed, $FAILED_COUNT failed, $TOTAL_COUNT total"
 
@@ -227,7 +225,7 @@ jobs:
                   "type": "section", 
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*🏆 Overall:*\n✅ ${{ steps.final-results.outputs.TOTAL_PASSED }} Passed\n❌ ${{ steps.final-results.outputs.TOTAL_FAILED }} Failed\n📋 ${{ steps.final-results.outputs.TOTAL_TESTS }} Total"
+                    "text": "*🏆 Overall Results:*\n✅ ${{ steps.final-results.outputs.TOTAL_PASSED }} Passed\n❌ ${{ steps.final-results.outputs.TOTAL_FAILED }} Failed\n📋 ${{ steps.final-results.outputs.TOTAL_TESTS }} Total"
                   }
                 },
                 {
@@ -247,14 +245,28 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*✅ Web Tests Passed:*\n${{ needs.web-tests.outputs.PASSED_TESTS | replace '|', '\n' }}"
+                    "text": "*✅ Web Tests Passed:*\n${{ needs.web-tests.outputs.PASSED_TESTS }}"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*❌ Web Tests Failed:*\n${{ needs.web-tests.outputs.FAILED_TESTS | replace '|', '\n' }}"
+                    "text": "*❌ Web Tests Failed:*\n${{ needs.web-tests.outputs.FAILED_TESTS }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*✅ Mobile Tests Passed:*\n${{ needs.mobile-tests.outputs.PASSED_TESTS }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*❌ Mobile Tests Failed:*\n${{ needs.mobile-tests.outputs.FAILED_TESTS }}"
                   }
                 },
                 {
@@ -264,7 +276,7 @@ jobs:
                       "type": "button",
                       "text": {
                         "type": "plain_text",
-                        "text": "📊 View Report",
+                        "text": "📊 View Detailed Report",
                         "emoji": true
                       },
                       "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
