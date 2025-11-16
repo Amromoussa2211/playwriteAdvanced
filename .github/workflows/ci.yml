@@ -1,148 +1,258 @@
-name: Test Automation CI/CD - Final Fixed
+name: 🧪 Enhanced Test Automation CI/CD
 
 on:
   push:
     branches: [ main, develop, master ]
   pull_request:
     branches: [ main, develop, master ]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - web
+          - mobile
 
 env:
   NODE_VERSION: '18'
 
 jobs:
   web-tests:
-    name: Web Tests
+    name: 🌐 Web Tests
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
     outputs:
-      PASSED: ${{ steps.parse-results.outputs.PASSED }}
-      FAILED: ${{ steps.parse-results.outputs.FAILED }}
-      TOTAL: ${{ steps.parse-results.outputs.TOTAL }}
+      PASSED_TESTS: ${{ steps.parse-results.outputs.PASSED_TESTS }}
+      FAILED_TESTS: ${{ steps.parse-results.outputs.FAILED_TESTS }}
+      PASSED_COUNT: ${{ steps.parse-results.outputs.PASSED_COUNT }}
+      FAILED_COUNT: ${{ steps.parse-results.outputs.FAILED_COUNT }}
+      TOTAL_COUNT: ${{ steps.parse-results.outputs.TOTAL_COUNT }}
     
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: npm install
 
-      - name: Install Playwright
+      - name: 🎭 Install Playwright
         run: npx playwright install
 
-      - name: Run Playwright tests
+      - name: 🧪 Run Playwright tests with JSON reporter
         env:
-          APP_URL: ${{ secrets.APP_URL }}
+          APP_URL: ${{ secrets.APP_URL || 'https://example.com' }}
         run: |
-          echo "Starting Playwright tests..."
-          npx playwright test --config=config/playwright.config.js --reporter=list 2>&1 | tee test-output.log || true
-          echo "TEST_COMPLETE=true" >> $GITHUB_ENV
+          echo "Starting Playwright tests with detailed reporting..."
+          npx playwright test --config=config/playwright.config.js --reporter=json,line
+        continue-on-error: true
 
-      - name: Parse Test Results
+      - name: 📊 Parse Web Test Results
         id: parse-results
         if: always()
         run: |
-          echo "=== PARSING TEST RESULTS ==="
-          
-          # Check if test output exists
-          if [ ! -f "test-output.log" ]; then
-            echo "No test output found"
-            PASSED="6"
-            FAILED="4"
+          # Try to find the JSON report file
+          REPORT_FILE=""
+          if [ -f "playwright-report/report.json" ]; then
+            REPORT_FILE="playwright-report/report.json"
+          elif [ -f "test-results/results.json" ]; then
+            REPORT_FILE="test-results/results.json"
+          elif [ -f "results.json" ]; then
+            REPORT_FILE="results.json"
           else
-            echo "Reading test output..."
-            OUTPUT=$(cat test-output.log)
-            echo "Raw output contains: $OUTPUT"
-            
-            # Extract counts with better regex
-            PASSED=$(echo "$OUTPUT" | grep -oE "([0-9]+) passed" | head -1 | grep -oE "[0-9]+" || echo "6")
-            FAILED=$(echo "$OUTPUT" | grep -oE "([0-9]+) failed" | head -1 | grep -oE "[0-9]+" || echo "4")
-            
-            echo "Extracted PASSED: $PASSED"
-            echo "Extracted FAILED: $FAILED"
-            
-            # Ensure we have valid numbers
-            if [ -z "$PASSED" ] || [ "$PASSED" = "0" ]; then
-              PASSED="6"
-              echo "Using fallback PASSED: $PASSED"
-            fi
-            
-            if [ -z "$FAILED" ] || [ "$FAILED" = "0" ]; then
-              FAILED="4"
-              echo "Using fallback FAILED: $FAILED"
+            echo "No JSON report found, using fallback method"
+            REPORT_FILE=""
+          fi
+          
+          if [ -n "$REPORT_FILE" ] && [ -f "$REPORT_FILE" ]; then
+            # Parse JSON report to extract test names
+            PASSED_TESTS=$(jq -r '.suites[]?.tests[]? | select(.status == "passed") | .title' "$REPORT_FILE" 2>/dev/null | paste -sd "|" - || echo "")
+            FAILED_TESTS=$(jq -r '.suites[]?.tests[]? | select(.status == "failed") | .title' "$REPORT_FILE" 2>/dev/null | paste -sd "|" - || echo "")
+            PASSED_COUNT=$(jq -r '[.suites[]?.tests[]?] | map(select(.status == "passed")) | length' "$REPORT_FILE" 2>/dev/null || echo "0")
+            FAILED_COUNT=$(jq -r '[.suites[]?.tests[]?] | map(select(.status == "failed")) | length' "$REPORT_FILE" 2>/dev/null || echo "0")
+          else
+            # Fallback: try to extract from HTML report if available
+            if [ -d "playwright-report" ]; then
+              PASSED_COUNT=$(find playwright-report -name "*.html" -exec grep -l "passed" {} \; | wc -l || echo "0")
+              FAILED_COUNT=$(find playwright-report -name "*.html" -exec grep -l "failed" {} \; | wc -l || echo "0")
+              PASSED_TESTS="Check HTML report for details"
+              FAILED_TESTS="Check HTML report for details"
+            else
+              # Final fallback: use console output parsing
+              PASSED_COUNT=$(echo "$TEST_OUTPUT" | grep -E "([0-9]+) passed" | grep -oE "[0-9]+" | head -1 || echo "0")
+              FAILED_COUNT=$(echo "$TEST_OUTPUT" | grep -E "([0-9]+) failed" | grep -oE "[0-9]+" | head -1 || echo "0")
+              PASSED_TESTS="Detailed names not available in console output"
+              FAILED_TESTS="Detailed names not available in console output"
             fi
           fi
           
-          TOTAL=$((PASSED + FAILED))
+          # Handle empty values
+          if [ -z "$PASSED_TESTS" ]; then PASSED_TESTS="None"; fi
+          if [ -z "$FAILED_TESTS" ]; then FAILED_TESTS="None"; fi
+          if [ -z "$PASSED_COUNT" ] || [ "$PASSED_COUNT" = "" ]; then PASSED_COUNT=0; fi
+          if [ -z "$FAILED_COUNT" ] || [ "$FAILED_COUNT" = "" ]; then FAILED_COUNT=0; fi
           
-          echo "FINAL COUNTS: PASSED=$PASSED, FAILED=$FAILED, TOTAL=$TOTAL"
+          TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
           
-          # Set outputs - this is critical!
-          echo "PASSED=$PASSED" >> $GITHUB_OUTPUT
-          echo "FAILED=$FAILED" >> $GITHUB_OUTPUT
-          echo "TOTAL=$TOTAL" >> $GITHUB_OUTPUT
+          echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_OUTPUT
+          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_OUTPUT
+          echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_OUTPUT
+          echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_OUTPUT
+          echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_OUTPUT
           
-          echo "=== OUTPUTS SET ==="
-          echo "PASSED=$PASSED" 
-          echo "FAILED=$FAILED"
-          echo "TOTAL=$TOTAL"
-
-      - name: Upload Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-            test-output.log
-          if-no-files-found: warn
+          echo "🌐 Web Test Results: $PASSED_COUNT passed, $FAILED_COUNT failed, $TOTAL_COUNT total"
 
   mobile-tests:
-    name: Mobile Tests
+    name: 📱 Mobile Tests
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_type == 'mobile' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+    outputs:
+      PASSED_TESTS: ${{ steps.parse-mobile-results.outputs.PASSED_TESTS }}
+      FAILED_TESTS: ${{ steps.parse-mobile-results.outputs.FAILED_TESTS }}
+      PASSED_COUNT: ${{ steps.parse-mobile-results.outputs.PASSED_COUNT }}
+      FAILED_COUNT: ${{ steps.parse-mobile-results.outputs.FAILED_COUNT }}
+      TOTAL_COUNT: ${{ steps.parse-mobile-results.outputs.TOTAL_COUNT }}
     
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: npm install
 
-      - name: Run Mobile tests
+      - name: 🧪 Run Mobile tests with JSON reporter
         run: |
-          echo "Starting mobile tests..."
-          echo "Mobile tests: 0 passed, 0 failed"
+          echo "Starting mobile tests with detailed reporting..."
+          npm run test:mobile -- --reporter=json --outputFile=mobile-test-results.json
+        continue-on-error: true
 
-  slack-results:
-    name: Slack Notification
+      - name: 📊 Parse Mobile Test Results
+        id: parse-mobile-results
+        if: always()
+        run: |
+          REPORT_FILE="mobile-test-results.json"
+          
+          if [ -f "$REPORT_FILE" ]; then
+            # Extract test names from mobile test report
+            PASSED_TESTS=$(jq -r '.testResults[]?.testResults[]? | select(.status === "passed") | .name' "$REPORT_FILE" 2>/dev/null | paste -sd "|" - || echo "")
+            FAILED_TESTS=$(jq -r '.testResults[]?.testResults[]? | select(.status === "failed") | .name' "$REPORT_FILE" 2>/dev/null | paste -sd "|" - || echo "")
+            PASSED_COUNT=$(jq -r '.testResults[]?.testResults[]?] | map(select(.status === "passed")) | length' "$REPORT_FILE" 2>/dev/null || echo "0")
+            FAILED_COUNT=$(jq -r '.testResults[]?.testResults[]?] | map(select(.status === "failed")) | length' "$REPORT_FILE" 2>/dev/null || echo "0")
+          else
+            # Fallback: use example values or parse console output
+            PASSED_COUNT="0"
+            FAILED_COUNT="0"
+            PASSED_TESTS="Check test logs for details"
+            FAILED_TESTS="Check test logs for details"
+          fi
+          
+          # Handle empty values
+          if [ -z "$PASSED_TESTS" ]; then PASSED_TESTS="None"; fi
+          if [ -z "$FAILED_TESTS" ]; then FAILED_TESTS="None"; fi
+          if [ -z "$PASSED_COUNT" ] || [ "$PASSED_COUNT" = "" ]; then PASSED_COUNT=0; fi
+          if [ -z "$FAILED_COUNT" ] || [ "$FAILED_COUNT" = "" ]; then FAILED_COUNT=0; fi
+          
+          TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
+          
+          echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_OUTPUT
+          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_OUTPUT
+          echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_OUTPUT
+          echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_OUTPUT
+          echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_OUTPUT
+          
+          echo "📱 Mobile Test Results: $PASSED_COUNT passed, $FAILED_COUNT failed, $TOTAL_COUNT total"
+
+  upload-test-reports:
+    name: 📤 Upload Test Reports
     runs-on: ubuntu-latest
-    needs: [web-tests]
+    needs: [web-tests, mobile-tests]
     if: always()
     
     steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: playwright-report
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-      - name: Debug Job Outputs
+      - name: 📋 Create Test Report Summary
+        id: create-report
         run: |
-          echo "=== DEBUGGING JOB OUTPUTS ==="
-          echo "web-tests.PASSED: '${{ needs.web-tests.outputs.PASSED }}'"
-          echo "web-tests.FAILED: '${{ needs.web-tests.outputs.FAILED }}'"
-          echo "web-tests.TOTAL: '${{ needs.web-tests.outputs.TOTAL }}"
-          echo "=== END DEBUG ==="
+          echo "Creating comprehensive test report summary..."
+          
+          WEB_PASSED=${{ needs.web-tests.outputs.PASSED_COUNT || 0 }}
+          WEB_FAILED=${{ needs.web-tests.outputs.FAILED_COUNT || 0 }}
+          WEB_TOTAL=${{ needs.web-tests.outputs.TOTAL_COUNT || 0 }}
+          
+          MOBILE_PASSED=${{ needs.mobile-tests.outputs.PASSED_COUNT || 0 }}
+          MOBILE_FAILED=${{ needs.mobile-tests.outputs.FAILED_COUNT || 0 }}
+          MOBILE_TOTAL=${{ needs.mobile-tests.outputs.TOTAL_COUNT || 0 }}
+          
+          TOTAL_PASSED=$((WEB_PASSED + MOBILE_PASSED))
+          TOTAL_FAILED=$((WEB_FAILED + MOBILE_FAILED))
+          TOTAL_TESTS=$((TOTAL_PASSED + TOTAL_FAILED))
+          
+          echo "TOTAL_PASSED=$TOTAL_PASSED" >> $GITHUB_OUTPUT
+          echo "TOTAL_FAILED=$TOTAL_FAILED" >> $GITHUB_OUTPUT
+          echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+          
+          if [ $TOTAL_FAILED -eq 0 ] && [ $TOTAL_TESTS -gt 0 ]; then
+            echo "STATUS=🎉 All tests passed" >> $GITHUB_OUTPUT
+          elif [ $TOTAL_FAILED -gt 0 ]; then
+            echo "STATUS=⚠️ Some tests failed" >> $GITHUB_OUTPUT
+          else
+            echo "STATUS=🔧 No tests executed" >> $GITHUB_OUTPUT
+          fi
+          
+          REPORT_SUMMARY="## Test Report Summary
+          
+### Web Tests
+- Passed: $WEB_PASSED
+- Failed: $WEB_FAILED
+- Total: $WEB_TOTAL
 
-      - name: Send Slack Notification
+### Mobile Tests
+- Passed: $MOBILE_PASSED
+- Failed: $MOBILE_FAILED
+- Total: $MOBILE_TOTAL
+
+### Overall
+- **Total Passed: $TOTAL_PASSED**
+- **Total Failed: $TOTAL_FAILED**
+- **Grand Total: $TOTAL_TESTS**
+
+**Status: ${{ steps.create-report.outputs.STATUS }}**
+**Report Generated: $(date)**
+
+[View Detailed GitHub Actions Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          
+          echo "$REPORT_SUMMARY" > test-report-summary.md
+
+      - name: 📄 Upload Test Report Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-summary
+          path: test-report-summary.md
+          retention-days: 30
+
+  slack-results:
+    name: 📢 Slack Notification
+    runs-on: ubuntu-latest
+    needs: [web-tests, mobile-tests, upload-test-reports]
+    if: always()
+    
+    steps:
+      - name: 📤 Send Enhanced Slack Report
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
@@ -151,19 +261,98 @@ jobs:
               "blocks": [
                 {
                   "type": "header",
-                  "text": { "type": "plain_text", "text": "🧪 Test Report - Final Fix", "emoji": true }
+                  "text": {
+                    "type": "plain_text", 
+                    "text": "🧪 Automated Test Report",
+                    "emoji": true
+                  }
                 },
                 {
                   "type": "section",
                   "fields": [
-                    { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
-                    { "type": "mrkdwn", "text": "*Web Tests:*\n✅ Passed: ${{ needs.web-tests.outputs.PASSED || '6' }}\n❌ Failed: ${{ needs.web-tests.outputs.FAILED || '4' }}" }
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn", 
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\n${{ needs.upload-test-reports.outputs.STATUS }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered by:*\n${{ github.actor }}"
+                    }
                   ]
                 },
-                { "type": "divider" },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section", 
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*🏆 Overall Results:*\n✅ ${{ needs.upload-test-reports.outputs.TOTAL_PASSED }} Passed | ❌ ${{ needs.upload-test-reports.outputs.TOTAL_FAILED }} Failed | 📋 ${{ needs.upload-test-reports.outputs.TOTAL_TESTS }} Total"
+                  }
+                },
                 {
                   "type": "section",
-                  "text": { "type": "mrkdwn", "text": "*Results Summary*\n\n✅ Web: ${{ needs.web-tests.outputs.PASSED || '6' }}/${{ needs.web-tests.outputs.TOTAL || '10' }}\n❌ Mobile: 0/0\n\n🔗 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>" }
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*🌐 Web Tests:*\n✅ ${{ needs.web-tests.outputs.PASSED_COUNT }} Passed\n❌ ${{ needs.web-tests.outputs.FAILED_COUNT }} Failed\n📋 ${{ needs.web-tests.outputs.TOTAL_COUNT }} Total"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📱 Mobile Tests:*\n✅ ${{ needs.mobile-tests.outputs.PASSED_COUNT }} Passed\n❌ ${{ needs.mobile-tests.outputs.FAILED_COUNT }} Failed\n📋 ${{ needs.mobile-tests.outputs.TOTAL_COUNT }} Total"
+                    }
+                  ]
+                },
+                ${{ needs.web-tests.outputs.PASSED_TESTS != 'None' && needs.web-tests.outputs.PASSED_TESTS != '' }} {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*✅ Web Tests Passed:*\n${{ needs.web-tests.outputs.PASSED_TESTS | replace '|', '\n' }}"
+                  }
+                },
+                ${{ needs.web-tests.outputs.FAILED_TESTS != 'None' && needs.web-tests.outputs.FAILED_TESTS != '' }} {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*❌ Web Tests Failed:*\n${{ needs.web-tests.outputs.FAILED_TESTS | replace '|', '\n' }}"
+                  }
+                },
+                ${{ needs.mobile-tests.outputs.PASSED_TESTS != 'None' && needs.mobile-tests.outputs.PASSED_TESTS != '' }} {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*✅ Mobile Tests Passed:*\n${{ needs.mobile-tests.outputs.PASSED_TESTS | replace '|', '\n' }}"
+                  }
+                },
+                ${{ needs.mobile-tests.outputs.FAILED_TESTS != 'None' && needs.mobile-tests.outputs.FAILED_TESTS != '' }} {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*❌ Mobile Tests Failed:*\n${{ needs.mobile-tests.outputs.FAILED_TESTS | replace '|', '\n' }}"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "📊 View Detailed Report",
+                        "emoji": true
+                      },
+                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "style": "primary"
+                    }
+                  ]
                 }
               ]
             }
