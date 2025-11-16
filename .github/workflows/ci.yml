@@ -61,16 +61,7 @@ jobs:
           echo "FAILED_COUNT=4" >> $GITHUB_ENV  
           echo "TOTAL_COUNT=10" >> $GITHUB_ENV
           
-          echo "TEST_DETAILS=- ❌ [chromium] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)
-- ❌ [chromium] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)
-- ❌ [firefox] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)
-- ❌ [firefox] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)
-- ✅ اختبارات التنقل (Navigation Tests)
-- ✅ اختبارات النماذج (Form Tests)
-- ✅ اختبارات الاستجابة (Responsive Tests)
-- ✅ اختبارات التحقق (Validation Tests)
-- ✅ اختبارات الأداء (Performance Tests)
-- ✅ اختبارات الأمان (Security Tests)" >> $GITHUB_ENV
+          echo "TEST_DETAILS=- ❌ [chromium] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n- ❌ [chromium] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n- ❌ [firefox] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n- ❌ [firefox] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n- ✅ اختبارات التنقل (Navigation Tests)\n- ✅ اختبارات النماذج (Form Tests)\n- ✅ اختبارات الاستجابة (Responsive Tests)\n- ✅ اختبارات التحقق (Validation Tests)\n- ✅ اختبارات الأداء (Performance Tests)\n- ✅ اختبارات الأمان (Security Tests)" >> $GITHUB_ENV
           
           echo "✅ All values set as environment variables"
           echo "🔍 Short SHA: $SHORT_SHA"
@@ -136,7 +127,7 @@ jobs:
                 "type": "header",
                 "text": {
                   "type": "plain_text",
-                  "text": "🧪  automation test result  - ${{ job.status }}"
+                  "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}"
                 }
               },
               {
@@ -144,11 +135,11 @@ jobs:
                 "fields": [
                   {
                     "type": "mrkdwn",
-                    "text": "*repo:* ${{ github.repository }}"
+                    "text": "*Repo:* ${{ github.repository }}"
                   },
                   {
                     "type": "mrkdwn", 
-                    "text": "*branch:* ${{ github.ref_name }}"
+                    "text": "*Branch:* ${{ github.ref_name }}"
                   },
                   {
                     "type": "mrkdwn",
@@ -156,7 +147,7 @@ jobs:
                   },
                   {
                     "type": "mrkdwn",
-                    "text": "*total count:* $TOTAL_COUNT"
+                    "text": "*Total TC:* $TOTAL_COUNT"
                   },
                   {
                     "type": "mrkdwn",
@@ -172,7 +163,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*تفاصيل الاختبارات:*\n$TEST_DETAILS"
+                  "text": "*TC details:*\n$TEST_DETAILS"
                 }
               },
               {
@@ -182,7 +173,7 @@ jobs:
                     "type": "button",
                     "text": {
                       "type": "plain_text",
-                      "text": "📊 show detailed report"
+                      "text": "📊 show report"
                     },
                     "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                   },
