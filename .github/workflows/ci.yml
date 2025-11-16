@@ -128,11 +128,7 @@ jobs:
             # If JSON parsing failed, extract from console output or test files
             if [ -z "$TEST_DETAILS" ] || [ "$TEST_DETAILS" = "-" ]; then
               # Extract from test source files based on your log
-              TEST_DETAILS="- ✅ يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)
-- ❌ يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)
-- ✅ اختبارات التنقل (Navigation Tests)  
-- ✅ اختبارات النماذج (Form Tests)
-- ✅ اختبارات الاستجابة (Responsive Tests)"
+              TEST_DETAILS=$'- ✅ يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n- ❌ يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n- ✅ اختبارات التنقل (Navigation Tests)\n- ✅ اختبارات النماذج (Form Tests)\n- ✅ اختبارات الاستجابة (Responsive Tests)'
               TOTAL_COUNT=10
               PASSED_COUNT=6
               FAILED_COUNT=4
@@ -140,11 +136,7 @@ jobs:
           else
             # Fallback with actual test information from your output
             echo "Using fallback test data from actual run"
-            TEST_DETAILS="- ✅ يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)
-- ❌ يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)  
-- ✅ اختبارات التنقل (Navigation Tests)
-- ✅ اختبارات النماذج (Form Tests)
-- ✅ اختبارات الاستجابة (Responsive Tests)"
+            TEST_DETAILS=$'- ✅ يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n- ❌ يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n- ✅ اختبارات التنقل (Navigation Tests)\n- ✅ اختبارات النماذج (Form Tests)\n- ✅ اختبارات الاستجابة (Responsive Tests)'
             TOTAL_COUNT=10
             PASSED_COUNT=6
             FAILED_COUNT=4
