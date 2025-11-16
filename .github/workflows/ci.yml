@@ -1,4 +1,4 @@
-name: Test Automation CI/CD - Final Fixed
+name: Test Automation CI/CD - Fixed Slack Output
 
 on:
   push:
@@ -121,11 +121,18 @@ jobs:
         run: |
           echo "=== GENERATING SLACK SUMMARY ==="
           
+          # Use the outputs from previous step
+          PASSED="${{ steps.web-results.outputs.PASSED_COUNT }}"
+          FAILED="${{ steps.web-results.outputs.FAILED_COUNT }}"
+          TOTAL="${{ steps.web-results.outputs.TOTAL_COUNT }}"
+          
+          echo "=== DEBUG: PASSED=$PASSED, FAILED=$FAILED, TOTAL=$TOTAL ==="
+          
           # Create Slack summary with Arabic test support
           echo "Test Results Summary" > slack_tests.txt
-          echo "Passed: ${{ steps.web-results.outputs.PASSED_COUNT }}" >> slack_tests.txt
-          echo "Failed: ${{ steps.web-results.outputs.FAILED_COUNT }}" >> slack_tests.txt
-          echo "Total: ${{ steps.web-results.outputs.TOTAL_COUNT }}" >> slack_tests.txt
+          echo "Passed: $PASSED" >> slack_tests.txt
+          echo "Failed: $FAILED" >> slack_tests.txt
+          echo "Total: $TOTAL" >> slack_tests.txt
           
           echo "Slack summary created"
           cat slack_tests.txt
@@ -181,7 +188,7 @@ jobs:
           echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
 
   slack-results:
-    name: Slack Notification (Final Fixed)
+    name: Slack Notification (Fixed)
     runs-on: ubuntu-latest
     needs: [web-tests, mobile-tests]
     if: always()
@@ -192,30 +199,30 @@ jobs:
         with:
           name: playwright-report
 
-      - name: Send Slack Notification
+      - name: Send Slack Notification with Debug
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
             {
-              "text": "Test Report - ${{ github.repository }}",
+              "text": "🧪 Test Report - ${{ github.repository }}",
               "blocks": [
                 {
                   "type": "header",
-                  "text": { "type": "plain_text", "text": "Automated Test Report - Arabic Tests", "emoji": true }
+                  "text": { "type": "plain_text", "text": "🧪 Automated Test Report - Arabic Tests", "emoji": true }
                 },
                 {
                   "type": "section",
                   "fields": [
                     { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
                     { "type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}" },
-                    { "type": "mrkdwn", "text": "*Web Tests:*\nPassed: ${{ needs.web-tests.outputs.PASSED_COUNT || '0' }}\nFailed: ${{ needs.web-tests.outputs.FAILED_COUNT || '0' }}" },
-                    { "type": "mrkdwn", "text": "*Mobile Tests:*\nPassed: ${{ needs.mobile-tests.outputs.PASSED_COUNT || '0' }}\nFailed: ${{ needs.mobile-tests.outputs.FAILED_COUNT || '0' }}" }
+                    { "type": "mrkdwn", "text": "*Web Tests:*\n✅ Passed: ${{ needs.web-tests.outputs.PASSED_COUNT }}\n❌ Failed: ${{ needs.web-tests.outputs.FAILED_COUNT }}" },
+                    { "type": "mrkdwn", "text": "*Mobile Tests:*\n✅ Passed: ${{ needs.mobile-tests.outputs.PASSED_COUNT }}\n❌ Failed: ${{ needs.mobile-tests.outputs.FAILED_COUNT }}" }
                   ]
                 },
                 { "type": "divider" },
                 {
                   "type": "section",
-                  "text": { "type": "mrkdwn", "text": "*Test Results Summary*\n\nPassed: ${{ needs.web-tests.outputs.PASSED_COUNT || '0' }}\nFailed: ${{ needs.web-tests.outputs.FAILED_COUNT || '0' }}\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ needs.web-tests.outputs.RUN_ID || github.run_id }}|View Full Results>" }
+                  "text": { "type": "mrkdwn", "text": "*Test Results Summary*\n\n✅ Passed: ${{ needs.web-tests.outputs.PASSED_COUNT }}\n❌ Failed: ${{ needs.web-tests.outputs.FAILED_COUNT }}\n📈 Total: ${{ needs.web-tests.outputs.TOTAL_COUNT }}\n\n🔗 <https://github.com/${{ github.repository }}/actions/runs/${{ needs.web-tests.outputs.RUN_ID }}|View Full Results>" }
                 },
                 { "type": "divider" },
                 {
@@ -223,14 +230,14 @@ jobs:
                   "elements": [
                     {
                       "type": "button",
-                      "text": { "type": "plain_text", "text": "View Results", "emoji": true },
-                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ needs.web-tests.outputs.RUN_ID || github.run_id }}",
+                      "text": { "type": "plain_text", "text": "📊 View Results", "emoji": true },
+                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ needs.web-tests.outputs.RUN_ID }}",
                       "style": "primary"
                     },
                     {
                       "type": "button",
-                      "text": { "type": "plain_text", "text": "Download Report", "emoji": true },
-                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ needs.web-tests.outputs.RUN_ID || github.run_id }}#artifacts"
+                      "text": { "type": "plain_text", "text": "📋 Download Report", "emoji": true },
+                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ needs.web-tests.outputs.RUN_ID }}#artifacts"
                     }
                   ]
                 }
