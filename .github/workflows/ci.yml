@@ -77,6 +77,7 @@ jobs:
           if-no-files-found: warn
 
       - name: 📝 Generate Slack Test Summary
+        id: generate-summary
         if: always()
         run: |
           echo "Generating Slack test summary..."
@@ -133,6 +134,7 @@ jobs:
         with:
           name: slack-details
           path: slack_tests.txt
+          if-no-files-found: warn
 
   mobile-tests:
     name: 📱 Mobile Tests
@@ -183,17 +185,35 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: slack-details
+          continue-on-error: true
 
       - name: 📥 Load Slack Test Summary
         id: load-tests
         run: |
-          # Simple approach to load Slack text content
+          # Check if the artifact was downloaded successfully
           if [ -f "slack_tests.txt" ]; then
             # Escape the content for JSON
             SLACK_CONTENT=$(cat slack_tests.txt | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
             echo "SLACK_TEXT=$SLACK_CONTENT" >> "$GITHUB_OUTPUT"
           else
-            echo "SLACK_TEXT=⚠️ Test summary not available" >> "$GITHUB_OUTPUT"
+            # Create default content if artifact wasn't found
+            echo "⚠️ Test summary not available.
+            
+🧪 *Test Summary*
+
+*Web Tests:*
+- Passed: ${{ needs.web-tests.outputs.PASSED_COUNT || '0' }}
+- Failed: ${{ needs.web-tests.outputs.FAILED_COUNT || '0' }}
+
+*Mobile Tests:*
+- Passed: ${{ needs.mobile-tests.outputs.PASSED_COUNT || '0' }}
+- Failed: ${{ needs.mobile-tests.outputs.FAILED_COUNT || '0' }}
+
+📊 Check the workflow logs for detailed results." > slack_tests_fallback.txt
+            
+            # Escape the content for JSON
+            SLACK_CONTENT=$(cat slack_tests_fallback.txt | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
+            echo "SLACK_TEXT=$SLACK_CONTENT" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 📤 Send Slack Report
