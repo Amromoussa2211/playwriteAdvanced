@@ -8,275 +8,147 @@ on:
   workflow_dispatch:
     inputs:
       test_type:
-        description: 'Test type to run'
+        description: 'Test type: web | mobile | all'
         required: true
         default: 'all'
-        type: choice
-        options:
-          - all
-          - web
-          - mobile
-
-env:
-  NODE_VERSION: '18'
 
 jobs:
-  web-tests:
-    name: 🌐 Web Tests
+  test:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
-    outputs:
-      PASSED_COUNT: ${{ steps.parse.outputs.PASSED_COUNT }}
-      FAILED_COUNT: ${{ steps.parse.outputs.FAILED_COUNT }}
-      TOTAL_COUNT: ${{ steps.parse.outputs.TOTAL_COUNT }}
-      FAILED_TESTS: ${{ steps.details.outputs.FAILED_TESTS }}
-      REPORT_URL: ${{ steps.upload-report.outputs.report_url || '' }}
 
     steps:
-      - name: 📥 Checkout code
+      # ------------------------------
+      # Checkout Code
+      # ------------------------------
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🔧 Setup Node.js
+      # ------------------------------
+      # Setup Node
+      # ------------------------------
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 18
 
-      - name: 📦 Install dependencies
+      # ------------------------------
+      # ------ INSTALL WEB ----------
+      # ------------------------------
+      - name: Install Web Dependencies
+        if: ${{ inputs.test_type == 'web' || inputs.test_type == 'all' }}
+        working-directory: ./tests/web
         run: npm install
 
-      - name: 🎭 Install Playwright Browsers
-        run: npx playwright install --with-deps
-
-      - name: 🧪 Run Playwright tests
+      # ------------------------------
+      # ------ RUN WEB TESTS --------
+      # ------------------------------
+      - name: Run Web Tests
+        if: ${{ inputs.test_type == 'web' || inputs.test_type == 'all' }}
+        working-directory: ./tests/web
         run: |
-          mkdir -p test-results
-          npx playwright test --config=config/playwright.config.js --reporter=line \
-            2>&1 | tee test-output.log || true
+          npx playwright install --with-deps
+          npm test || true
 
-      - name: 📁 Upload Playwright HTML report
-        if: always()
-        id: upload-report
+      # ------------------------------
+      # ------ SAVE WEB RESULTS -----
+      # ------------------------------
+      - name: Save Web Test Results
+        if: ${{ inputs.test_type == 'web' || inputs.test_type == 'all' }}
+        run: |
+          mkdir -p artifacts/web
+          if [ -f "./tests/web/results.json" ]; then
+            cp ./tests/web/results.json artifacts/web/
+          else
+            echo '{"error":"results.json not found"}' > artifacts/web/results.json
+          fi
+
+      # ------------------------------
+      # ------ INSTALL MOBILE -------
+      # ------------------------------
+      - name: Install Mobile Dependencies
+        if: ${{ inputs.test_type == 'mobile' || inputs.test_type == 'all' }}
+        working-directory: ./tests/mobile
+        run: npm install
+
+      # ------------------------------
+      # ------ RUN MOBILE TESTS -----
+      # ------------------------------
+      - name: Run Mobile Tests (Appium + WebdriverIO)
+        if: ${{ inputs.test_type == 'mobile' || inputs.test_type == 'all' }}
+        working-directory: ./tests/mobile
+        run: |
+          npm run test || true
+
+      # ------------------------------
+      # ------ SAVE MOBILE RESULTS ---
+      # ------------------------------
+      - name: Save Mobile Test Results
+        if: ${{ inputs.test_type == 'mobile' || inputs.test_type == 'all' }}
+        run: |
+          mkdir -p artifacts/mobile
+          if [ -f "./tests/mobile/results.json" ]; then
+            cp ./tests/mobile/results.json artifacts/mobile/
+          else
+            echo '{"error":"results.json not found"}' > artifacts/mobile/results.json
+          fi
+
+      # ------------------------------
+      # ------ UPLOAD ARTIFACTS -----
+      # ------------------------------
+      - name: Upload Test Reports
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-html-report
-          path: playwright-report
+          name: test-reports
+          path: artifacts
+          retention-days: 7
 
-      - name: 📊 Parse Playwright Summary Counts
-        id: parse
-        if: always()
+      # ------------------------------
+      # ------ PARSE RESULTS --------
+      # ------------------------------
+      - name: Parse Test Results
+        id: summaryParser
         run: |
-          OUTPUT=$(cat test-output.log || true)
-
-          PASSED=$(echo "$OUTPUT" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | head -1 || echo 0)
-          FAILED=$(echo "$OUTPUT" | grep -Eo "[0-9]+ failed" | grep -Eo "[0-9]+" | head -1 || echo 0)
-
-          # If Playwright prints "0 passed" not found, ensure defaults
-          if [ -z "$PASSED" ]; then PASSED=0; fi
-          if [ -z "$FAILED" ]; then FAILED=0; fi
-
-          TOTAL=$((PASSED + FAILED))
-
-          echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
-          echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
-          echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
-
-      - name: 🔍 Extract Playwright Failed Test Names (from JSON)
-        id: details
-        if: always()
-        run: |
-          FAILED_TESTS="results.json not found"
-          if [ -f test-results/results.json ]; then
-            # extract failing tests titles (works for Playwright json shape)
-            FAILED_TESTS=$(jq -r '
-              def walk_tests:
-                .suites[]?.specs[]? |
-                .tests[]? |
-                { title: .title, status: .status } ;
-              [ walk_tests | select(.status=="failed") | .title ] | join("\n")
-            ' test-results/results.json || true)
-
-            if [ -z "$FAILED_TESTS" ]; then
-              FAILED_TESTS="No failed tests 🎉"
-            fi
+          # Web
+          if [ -f artifacts/web/results.json ]; then
+            WEB_TOTAL=$(jq '.stats.tests // 0' artifacts/web/results.json)
+            WEB_PASSED=$(jq '.stats.passes // 0' artifacts/web/results.json)
+            WEB_FAILED=$(jq '.stats.failures // 0' artifacts/web/results.json)
           else
-            # fallback: parse console output log for failed test names (best-effort)
-            if grep -q "failed" test-output.log 2>/dev/null; then
-              FAILED_TESTS=$(grep -nE "failed|FAIL" test-output.log | sed -n '1,200p' | sed ':a;N;$!ba;s/\n/\\n/g' || echo "See test-output.log")
-            fi
+            WEB_TOTAL=0; WEB_PASSED=0; WEB_FAILED=0;
           fi
 
-          # sanitize for GITHUB_OUTPUT (avoid bare newlines — keep \n)
-          FAILED_TESTS_ESCAPED=$(echo "$FAILED_TESTS" | sed ':a;N;$!ba;s/\n/\\n/g' )
-          echo "FAILED_TESTS=$FAILED_TESTS_ESCAPED" >> $GITHUB_OUTPUT
-
-  mobile-tests:
-    name: 📱 Mobile Tests (WebdriverIO + Appium)
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.test_type == 'mobile' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
-    outputs:
-      PASSED_COUNT: ${{ steps.parse.outputs.PASSED_COUNT }}
-      FAILED_COUNT: ${{ steps.parse.outputs.FAILED_COUNT }}
-      TOTAL_COUNT: ${{ steps.parse.outputs.TOTAL_COUNT }}
-      FAILED_TESTS: ${{ steps.details.outputs.FAILED_TESTS }}
-      ARTIFACT_URL: ${{ steps.upload-artifacts.outputs.artifact_url || '' }}
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: 📦 Install dependencies
-        run: npm ci
-
-      - name: 🧰 Install Appium (local start)
-        run: |
-          # Install Appium locally so we can run it if tests require a local server.
-          # If you use cloud device provider/remove local start as appropriate.
-          npm i -g appium@2 || true
-
-      - name: 🚀 Start Appium in background
-        if: always()
-        run: |
-          # start appium in background to listen on default 4723
-          # logs go to appium-server.log
-          nohup appium --log-level error > appium-server.log 2>&1 &
-          # give Appium a bit of time to warm up
-          sleep 3
-
-      - name: 🧪 Run Mobile Tests (WebdriverIO)
-        run: |
-          mkdir -p tests/mobile/results || true
-          # Attempt common wdio invocation; adjust if your repo uses a different command
-          if [ -f ./tests/mobile/wdio.conf.js ]; then
-            # Use json reporter if possible (write to tests/mobile/results.json)
-            npx wdio run ./tests/mobile/wdio.conf.js --reporters json --reporter-options outputDir=./tests/mobile || true
+          # Mobile
+          if [ -f artifacts/mobile/results.json ]; then
+            MOBILE_TOTAL=$(jq '.stats.tests // 0' artifacts/mobile/results.json)
+            MOBILE_PASSED=$(jq '.stats.passes // 0' artifacts/mobile/results.json)
+            MOBILE_FAILED=$(jq '.stats.failures // 0' artifacts/mobile/results.json)
           else
-            # fallback to your npm script (you mentioned test:mobile)
-            npm run test:mobile 2>&1 | tee mobile-output.log || true
+            MOBILE_TOTAL=0; MOBILE_PASSED=0; MOBILE_FAILED=0;
           fi
 
-      - name: 📁 Upload Mobile artifacts (logs & reports)
-        id: upload-artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mobile-reports
-          path: |
-            tests/mobile/results
-            tests/mobile/report*
-            tests/mobile/allure-results
-            mobile-output.log
-            appium-server.log
-
-      - name: 📊 Parse Mobile Summary Counts
-        id: parse
-        if: always()
-        run: |
-          PASSED=0
-          FAILED=0
-
-          # try JSON result location(s)
-          if [ -f tests/mobile/results/results.json ]; then
-            # attempt to parse a generic results.json shape
-            PASSED=$(jq '[.suites[].specs[].tests[]? | select(.status=="passed")] | length' tests/mobile/results/results.json 2>/dev/null || echo 0)
-            FAILED=$(jq '[.suites[].specs[].tests[]? | select(.status=="failed")] | length' tests/mobile/results/results.json 2>/dev/null || echo 0)
-          elif [ -f tests/mobile/results.json ]; then
-            PASSED=$(jq '[.tests[]? | select(.status=="passed")] | length' tests/mobile/results.json 2>/dev/null || echo 0)
-            FAILED=$(jq '[.tests[]? | select(.status=="failed")] | length' tests/mobile/results.json 2>/dev/null || echo 0)
-          else
-            # fallback to grepping mobile-output.log
-            if [ -f mobile-output.log ]; then
-              PASSED=$(grep -Eo "[0-9]+ passing" mobile-output.log | grep -Eo "[0-9]+" | head -1 || echo 0)
-              FAILED=$(grep -Eo "[0-9]+ failing" mobile-output.log | grep -Eo "[0-9]+" | head -1 || echo 0)
-            fi
-          fi
-
-          if [ -z "$PASSED" ]; then PASSED=0; fi
-          if [ -z "$FAILED" ]; then FAILED=0; fi
-
-          TOTAL=$((PASSED + FAILED))
-
-          echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
-          echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
-          echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
-
-      - name: 🔍 Extract Mobile Failed Test Names (logs or JSON)
-        id: details
-        if: always()
-        run: |
-          FAILED_TESTS="No failed tests 🎉"
-
-          if [ -f tests/mobile/results/results.json ]; then
-            # example generic extraction
-            FAILED_TESTS=$(jq -r '[.suites[].specs[].tests[]? | select(.status=="failed") | .title] | join("\n")' tests/mobile/results/results.json 2>/dev/null || true)
-          elif [ -f tests/mobile/results.json ]; then
-            FAILED_TESTS=$(jq -r '[.tests[]? | select(.status=="failed") | .fullTitle // .title] | join("\n")' tests/mobile/results.json 2>/dev/null || true)
-          elif [ -f mobile-output.log ]; then
-            # Best-effort grep for failing lines (Mocha/WebdriverIO style)
-            FAILED_TESTS=$(grep -nE "fail|FAIL|AssertionError|Error:" mobile-output.log | sed -n '1,200p' | sed ':a;N;$!ba;s/\n/\\n/g' || true)
-          fi
-
-          if [ -z "$FAILED_TESTS" ]; then
-            FAILED_TESTS="No failed tests 🎉"
-          fi
-
-          FAILED_TESTS_ESCAPED=$(echo "$FAILED_TESTS" | sed ':a;N;$!ba;s/\n/\\n/g')
-          echo "FAILED_TESTS=$FAILED_TESTS_ESCAPED" >> $GITHUB_OUTPUT
-
-  slack-results:
-    name: 📢 Slack Notification
-    runs-on: ubuntu-latest
-    needs: [web-tests, mobile-tests]
-    if: always()
-
-    steps:
-      - name: 🧾 Gather final results
-        id: summary
-        run: |
-          # Web outputs
-          WEB_PASSED="${{ needs.web-tests.outputs.PASSED_COUNT || '0' }}"
-          WEB_FAILED="${{ needs.web-tests.outputs.FAILED_COUNT || '0' }}"
-          WEB_TOTAL="${{ needs.web-tests.outputs.TOTAL_COUNT || '0' }}"
-          WEB_FAILED_LIST="${{ needs.web-tests.outputs.FAILED_TESTS || 'No results available' }}"
-
-          # Mobile outputs
-          MOBILE_PASSED="${{ needs.mobile-tests.outputs.PASSED_COUNT || '0' }}"
-          MOBILE_FAILED="${{ needs.mobile-tests.outputs.FAILED_COUNT || '0' }}"
-          MOBILE_TOTAL="${{ needs.mobile-tests.outputs.TOTAL_COUNT || '0' }}"
-          MOBILE_FAILED_LIST="${{ needs.mobile-tests.outputs.FAILED_TESTS || 'No results available' }}"
-
-          # report/artifact link (artifact page of this run)
-          REPORT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
-
-          # prepare outputs (escape newlines already escaped in job outputs)
+          echo "web_total=$WEB_TOTAL" >> $GITHUB_OUTPUT
           echo "web_passed=$WEB_PASSED" >> $GITHUB_OUTPUT
           echo "web_failed=$WEB_FAILED" >> $GITHUB_OUTPUT
-          echo "web_total=$WEB_TOTAL" >> $GITHUB_OUTPUT
-          echo "web_failed_tests=$WEB_FAILED_LIST" >> $GITHUB_OUTPUT
 
+          echo "mobile_total=$MOBILE_TOTAL" >> $GITHUB_OUTPUT
           echo "mobile_passed=$MOBILE_PASSED" >> $GITHUB_OUTPUT
           echo "mobile_failed=$MOBILE_FAILED" >> $GITHUB_OUTPUT
-          echo "mobile_total=$MOBILE_TOTAL" >> $GITHUB_OUTPUT
-          echo "mobile_failed_tests=$MOBILE_FAILED_LIST" >> $GITHUB_OUTPUT
 
-          echo "report_url=$REPORT_URL" >> $GITHUB_OUTPUT
-
-      - name: 📤 Send Slack Report
+      # ------------------------------
+      # ------ SEND SLACK MESSAGE ----
+      # ------------------------------
+      - name: Slack Notification
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
             {
+              "text": "Automated Test Report",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "🧪 Automated Test Report",
-                    "emoji": true
+                    "text": "🧪 Automated Test Report"
                   }
                 },
                 {
@@ -288,69 +160,41 @@ jobs:
                   ]
                 },
                 { "type": "divider" },
-
                 {
                   "type": "section",
-                  "text": {
+                  "text": { 
                     "type": "mrkdwn",
-                    "text": "*🌐 Web Test Summary:*\n✅ ${{ steps.summary.outputs.web_passed }} Passed\n❌ ${{ steps.summary.outputs.web_failed }} Failed\n📋 ${{ steps.summary.outputs.web_total }} Total"
+                    "text": "*🌐 Web Test Summary:*\n✅ ${{ steps.summaryParser.outputs.web_passed }} Passed\n❌ ${{ steps.summaryParser.outputs.web_failed }} Failed\n📋 ${{ steps.summaryParser.outputs.web_total }} Total"
                   }
                 },
                 {
                   "type": "section",
-                  "text": {
+                  "text": { 
                     "type": "mrkdwn",
-                    "text": "*❌ Web Failed Tests:*\n${{ steps.summary.outputs.web_failed_tests }}"
+                    "text": "*📱 Mobile Test Summary:*\n✅ ${{ steps.summaryParser.outputs.mobile_passed }} Passed\n❌ ${{ steps.summaryParser.outputs.mobile_failed }} Failed\n📋 ${{ steps.summaryParser.outputs.mobile_total }} Total"
                   }
                 },
-
                 { "type": "divider" },
-
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*📱 Mobile Test Summary:*\n✅ ${{ steps.summary.outputs.mobile_passed }} Passed\n❌ ${{ steps.summary.outputs.mobile_failed }} Failed\n📋 ${{ steps.summary.outputs.mobile_total }} Total"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*❌ Mobile Failed Tests:*\n${{ steps.summary.outputs.mobile_failed_tests }}"
-                  }
-                },
-
-                { "type": "divider" },
-
                 {
                   "type": "actions",
                   "elements": [
                     {
                       "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "📄 Download HTML Report",
-                        "emoji": true
-                      },
-                      "url": "${{ steps.summary.outputs.report_url }}",
+                      "text": { "type": "plain_text", "text": "📄 Download HTML Report" },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts",
                       "style": "primary"
                     },
                     {
                       "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "📊 Open CI Run",
-                        "emoji": true
-                      },
-                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                      "text": { "type": "plain_text", "text": "📊 Open CI Run" },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                     }
                   ]
                 }
               ]
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
 
           
