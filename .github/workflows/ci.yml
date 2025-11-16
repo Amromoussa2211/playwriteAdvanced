@@ -235,7 +235,6 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
 # name: 🧪 Test Automation CI/CD
 
 # on:
