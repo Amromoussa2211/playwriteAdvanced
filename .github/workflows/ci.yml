@@ -1,214 +1,201 @@
-name: 🎯 Simple Test Names Fix
-
+name: 🎯 Final Test Parser Fix
 on:
-  push:
-    branches: [ main, develop, master ]
-  workflow_dispatch:
-    inputs:
-      test_type:
-        description: 'Simple test run'
-        required: true
-        default: 'web'
-        type: choice
-        options:
-          - web
-          - mobile
-
+push:
+branches: [ main, develop, master ]
+workflow_dispatch:
+inputs:
+test_type:
+description: 'Test type to run'
+required: true
+default: 'web'
+type: choice
+options:
+- web
+- mobile
 env:
-  NODE_VERSION: '18'
-
+NODE_VERSION: '18'
 jobs:
-  web-tests:
-    name: 🌐 Web Tests
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
-    outputs:
-      PASSED_COUNT: ${{ steps.simple-results.outputs.PASSED_COUNT }}
-      FAILED_COUNT: ${{ steps.simple-results.outputs.FAILED_COUNT }}
-      TOTAL_COUNT: ${{ steps.simple-results.outputs.TOTAL_COUNT }}
-      PASSED_TESTS: ${{ steps.simple-results.outputs.PASSED_TESTS }}
-      FAILED_TESTS: ${{ steps.simple-results.outputs.FAILED_TESTS }}
-    
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: 📦 Install dependencies
-        run: npm install
-
-      - name: 🎭 Install Playwright
-        run: npx playwright install
-
-      - name: 🧪 Run Playwright tests
-        env:
-          APP_URL: ${{ secrets.APP_URL || 'https://example.com' }}
-        run: |
-          echo "=== RUNNING PLAYWRIGHT TESTS ==="
-          npx playwright test --config=config/playwright.config.js
-        continue-on-error: true
-
-      - name: 📊 Simple Test Results Parser
-        id: simple-results
-        if: always()
-        run: |
-          echo "=== PARSING TEST RESULTS ==="
-          
-          # Initialize variables
-          PASSED_COUNT=0
-          FAILED_COUNT=0
-          TOTAL_COUNT=0
-          PASSED_TESTS="No tests found"
-          FAILED_TESTS="No tests found"
-          
-          # Method 1: Try to parse JSON if it exists
-          if [ -f "test-results/results.json" ]; then
-            echo "Found JSON report, trying to parse..."
-            
-            # Extract test names from JSON (multiple possible structures)
-            JSON_TESTS=$(jq -r '.. | select(.title?) | .title' test-results/results.json 2>/dev/null | grep -v '^null$' || echo "")
-            JSON_STATUSES=$(jq -r '.. | select(.status?) | .status' test-results/results.json 2>/dev/null | grep -v '^null$' || echo "")
-            
-            if [ -n "$JSON_TESTS" ] && [ -n "$JSON_STATUSES" ]; then
-              echo "Successfully extracted from JSON"
-              
-              # Count and extract by status
-              PASSED_TESTS=$(echo "$JSON_TESTS" | paste -sd " " -)
-              FAILED_TESTS=$(echo "$JSON_STATUSES" | paste -sd " " -)
-              
-              # Count tests
-              PASSED_COUNT=$(echo "$JSON_STATUSES" | grep -c "passed" || echo "0")
-              FAILED_COUNT=$(echo "$JSON_STATUSES" | grep -c "failed" || echo "0")
-              TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
-              
-              echo "JSON Parsed: $PASSED_COUNT passed, $FAILED_COUNT failed"
-            else
-              echo "JSON exists but couldn't parse - falling back to test file names"
-              FALLBACK=1
-            fi
-          else
-            echo "No JSON report found - falling back to test file names"
-            FALLBACK=1
-          fi
-          
-          # Method 2: Fallback to test file names if JSON parsing failed
-          if [ "$FALLBACK" = "1" ] || [ "$PASSED_COUNT" = "0" ] && [ "$FAILED_COUNT" = "0" ]; then
-            echo "Using fallback method: extracting test names from files"
-            
-            # Find test files and extract describe/test names
-            TEST_NAMES=""
-            if [ -d "tests/web" ]; then
-              for file in tests/web/*.js tests/web/*.spec.js tests/web/*.test.js; do
-                if [ -f "$file" ]; then
-                  # Extract describe block names
-                  DESCRIBE_NAMES=$(grep -o "describe(['\"].*['\"].*[,)]" "$file" 2>/dev/null | sed "s/describe(['\"]//" | sed "s/['\"].*[,)].*//" || echo "")
-                  
-                  # Extract test names (it blocks)
-                  TEST_BLOCKS=$(grep -o "test(['\"].*['\"].*[,)]\\|it(['\"].*['\"].*[,)]" "$file" 2>/dev/null | sed "s/test(['\"]//" | sed "s/it(['\"]//" | sed "s/['\"].*[,)].*//" || echo "")
-                  
-                  if [ -n "$DESCRIBE_NAMES" ]; then
-                    TEST_NAMES="$TEST_NAMES $DESCRIBE_NAMES"
-                  fi
-                  if [ -n "$TEST_BLOCKS" ]; then
-                    TEST_NAMES="$TEST_NAMES $TEST_BLOCKS"
-                  fi
-                fi
-              done
-            fi
-            
-            # If we found test names, use them
-            if [ -n "$TEST_NAMES" ]; then
-              PASSED_TESTS="Found $(echo "$TEST_NAMES" | wc -w) tests: $(echo "$TEST_NAMES" | sed 's/  */ /g' | cut -c1-200)"
-              FAILED_TESTS="None found"
-              PASSED_COUNT=$(echo "$TEST_NAMES" | wc -w)
-              TOTAL_COUNT=$PASSED_COUNT
-              echo "Found $PASSED_COUNT tests from file parsing"
-            else
-              echo "No test names found anywhere"
-              PASSED_TESTS="No test names could be extracted - check test structure"
-              FAILED_TESTS="No test names could be extracted - check test structure"
-            fi
-          fi
-          
-          # Ensure we have valid numbers
-          if [ -z "$PASSED_COUNT" ] || [ "$PASSED_COUNT" = "" ]; then PASSED_COUNT=0; fi
-          if [ -z "$FAILED_COUNT" ] || [ "$FAILED_COUNT" = "" ]; then FAILED_COUNT=0; fi
-          if [ -z "$TOTAL_COUNT" ] || [ "$TOTAL_COUNT" = "" ]; then TOTAL_COUNT=0; fi
-          
-          # Output results
-          echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_OUTPUT
-          echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_OUTPUT
-          echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_OUTPUT
-          echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_OUTPUT
-          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_OUTPUT
-          
-          echo ""
-          echo "=== FINAL RESULTS ==="
-          echo "Passed: $PASSED_COUNT"
-          echo "Failed: $FAILED_COUNT"
-          echo "Total: $TOTAL_COUNT"
-          echo "Passed Tests: $PASSED_TESTS"
-          echo "Failed Tests: $FAILED_TESTS"
-
-      - name: 📤 Send to Slack
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          payload: |
-            {
-              "text": "🧪 Test Report",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text", 
-                    "text": "🧪 Simple Test Report",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Test Results:*\n✅ ${{ steps.simple-results.outputs.PASSED_COUNT }} Passed\n❌ ${{ steps.simple-results.outputs.FAILED_COUNT }} Failed\n📋 ${{ steps.simple-results.outputs.TOTAL_COUNT }} Total"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*✅ Tests Found:*\n${{ steps.simple-results.outputs.PASSED_TESTS }}"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*❌ Failed Tests:*\n${{ steps.simple-results.outputs.FAILED_TESTS }}"
-                  }
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "📋 View Details",
-                        "emoji": true
-                      },
-                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                      "style": "primary"
-                    }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+web-tests:
+name: 🌐 Web Tests
+runs-on: ubuntu-latest
+if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+outputs:
+PASSED_COUNT: ${{ steps.final-parser.outputs.PASSED_COUNT }}
+FAILED_COUNT: ${{ steps.final-parser.outputs.FAILED_COUNT }}
+TOTAL_COUNT: ${{ steps.final-parser.outputs.TOTAL_COUNT }}
+PASSED_TESTS: ${{ steps.final-parser.outputs.PASSED_TESTS }}
+FAILED_TESTS: ${{ steps.final-parser.outputs.FAILED_TESTS }}
+steps:
+- name: 📥 Checkout code
+uses: actions/checkout@v4
+- name: 🔧 Setup Node.js
+uses: actions/setup-node@v4
+with:
+node-version: ${{ env.NODE_VERSION }}
+- name: 📦 Install dependencies
+run: npm install
+- name: 🎭 Install Playwright
+run: npx playwright install
+- name: 🧪 Run Playwright tests
+env:
+APP_URL: ${{ secrets.APP_URL || 'https://example.com' }}
+run: |
+echo "=== RUNNING PLAYWRIGHT TESTS ==="
+npx playwright test --config=config/playwright.config.js
+continue-on-error: true
+- name: 📄 Upload test results
+uses: actions/upload-artifact@v4
+if: always()
+with:
+name: test-results-final
+path: test-results/
+- name: 🎯 Final Test Parser
+id: final-parser
+if: always()
+run: |
+echo "=== PARSING TEST RESULTS ==="
+# Initialize
+PASSED_COUNT=0
+FAILED_COUNT=0
+TOTAL_COUNT=0
+PASSED_TESTS="No tests found"
+FAILED_TESTS="None"
+# Method 1: Parse JSON if exists
+if [ -f "test-results/results.json" ]; then
+echo "Found JSON report..."
+# Extract test titles and clean them
+TITLES=$(jq -r '.. | .title? | select(. != null and . != "" and . != "test")' test-results/results.json 2>/dev/null | sort -u | head -10 || echo "")
+if [ -n "$TITLES" ]; then
+echo "✅ Successfully parsed JSON"
+# Count and format
+PASSED_COUNT=$(echo "$TITLES" | wc -l | tr -d ' ')
+TOTAL_COUNT=$PASSED_COUNT
+# Format for Slack (bullet points)
+PASSED_TESTS=$(echo "$TITLES" | sed 's/^/- /' | head -10 | tr '\n' '\n' | sed 's/\n\n/\n/g')
+FAILED_TESTS="None"
+echo "📊 Results: $PASSED_COUNT tests found"
+else
+echo "❌ JSON exists but no valid titles found"
+FALLBACK=1
+fi
+else
+echo "❌ No JSON report found"
+FALLBACK=1
+fi
+# Method 2: Fallback to file parsing
+if [ "$FALLBACK" = "1" ]; then
+echo "🔄 Using fallback: extracting from test files..."
+# Extract test names from test files
+TEST_NAMES=""
+if [ -d "tests/web" ]; then
+for file in tests/web/*.js tests/web/*.spec.js tests/web/*.test.js; do
+if [ -f "$file" ]; then
+# Clean regex to get test names only
+CLEAN_NAMES=$(grep -o "test(['\"][^'\"]\{1,50\}['\"]" "$file" 2>/dev/null | \
+sed "s/test(['\"]//" | \
+sed "s/['\"]//g" | \
+grep -v '^$' | \
+grep -v '^[0-9]\+$' | \
+head -10)
+if [ -n "$CLEAN_NAMES" ]; then
+TEST_NAMES="$TEST_NAMES
+$CLEAN_NAMES"
+fi
+fi
+done
+fi
+if [ -n "$TEST_NAMES" ]; then
+echo "✅ Fallback successful"
+# Clean and count
+CLEAN_TEST_NAMES=$(echo "$TEST_NAMES" | grep -v '^$' | sort -u)
+PASSED_COUNT=$(echo "$CLEAN_TEST_NAMES" | wc -l | tr -d ' ')
+TOTAL_COUNT=$PASSED_COUNT
+# Format for Slack
+PASSED_TESTS=$(echo "$CLEAN_TEST_NAMES" | head -10 | sed 's/^/- /' | tr '\n' '\n' | sed 's/\n\n/\n/g')
+FAILED_TESTS="None"
+echo "📊 Results: $PASSED_COUNT tests from files"
+else
+echo "❌ Fallback failed - no test names found"
+PASSED_TESTS="No test names could be extracted - check test file structure"
+FAILED_TESTS="No test names could be extracted - check test file structure"
+fi
+fi
+# Ensure valid numbers
+PASSED_COUNT=${PASSED_COUNT:-0}
+FAILED_COUNT=${FAILED_COUNT:-0}
+TOTAL_COUNT=${TOTAL_COUNT:-$PASSED_COUNT}
+# Escape special characters for GitHub Actions
+PASSED_ESCAPED=$(echo "$PASSED_TESTS" | sed 's/"/\\"/g' | sed 's/\n/\\n/g' | sed 's/\r//g')
+FAILED_ESCAPED=$(echo "$FAILED_TESTS" | sed 's/"/\\"/g' | sed 's/\n/\\n/g' | sed 's/\r//g')
+# Set outputs
+echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_OUTPUT
+echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_OUTPUT
+echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_OUTPUT
+echo "PASSED_TESTS=$PASSED_ESCAPED" >> $GITHUB_OUTPUT
+echo "FAILED_TESTS=$FAILED_ESCAPED" >> $GITHUB_OUTPUT
+echo ""
+echo "=== FINAL RESULTS ==="
+echo "✅ Passed: $PASSED_COUNT"
+echo "❌ Failed: $FAILED_COUNT"
+echo "📋 Total: $TOTAL_COUNT"
+echo ""
+echo "Test names preview:"
+echo "$PASSED_TESTS" | head -5
+- name: 📤 Send to Slack
+uses: slackapi/slack-github-action@v1.24.0
+with:
+payload: |
+{
+"text": "🎯 Final Test Report",
+"blocks": [
+{
+"type": "header",
+"text": {
+"type": "plain_text", 
+"text": "🎯 Test Report",
+"emoji": true
+}
+},
+{
+"type": "section",
+"text": {
+"type": "mrkdwn",
+"text": "*Test Results:*\n✅ ${{ steps.final-parser.outputs.PASSED_COUNT }} Passed\n❌ ${{ steps.final-parser.outputs.FAILED_COUNT }} Failed\n📋 ${{ steps.final-parser.outputs.TOTAL_COUNT }} Total"
+}
+},
+{
+"type": "section",
+"text": {
+"type": "mrkdwn",
+"text": "*✅ Test Names:*\n${{ steps.final-parser.outputs.PASSED_TESTS }}"
+}
+},
+{
+"type": "section",
+"text": {
+"type": "mrkdwn",
+"text": "*❌ Failed Tests:*\n${{ steps.final-parser.outputs.FAILED_TESTS }}"
+}
+},
+{
+"type": "actions",
+"elements": [
+{
+"type": "button",
+"text": {
+"type": "plain_text",
+"text": "📋 View Full Report",
+"emoji": true
+},
+"url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+"style": "primary"
+}
+]
+}
+]
+}
+env:
+SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 # name: 🧪 Test Automation CI/CD
 
 # on:
