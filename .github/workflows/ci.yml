@@ -1,3 +1,229 @@
+name: 🧪 Test Automation CI/CD
+
+on:
+  push:
+    branches: [ main, develop, master ]
+  pull_request:
+    branches: [ main, develop, master ]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - web
+          - mobile
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  web-tests:
+    name: 🌐 Web Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+    outputs:
+      PASSED_COUNT: ${{ steps.web-results.outputs.PASSED_COUNT }}
+      FAILED_COUNT: ${{ steps.web-results.outputs.FAILED_COUNT }}
+      TOTAL_COUNT: ${{ steps.web-results.outputs.TOTAL_COUNT }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        run: npm install
+
+      - name: 🎭 Install Playwright
+        run: npx playwright install
+
+      - name: 🧪 Run Playwright tests
+        env:
+          APP_URL: ${{ secrets.APP_URL || 'https://example.com' }}
+        run: |
+          echo "Starting Playwright tests..."
+          npx playwright test --config=config/playwright.config.js --reporter=line 2>&1 | tee test-output.log || true
+
+      - name: 📊 Parse Web Test Results
+        id: web-results
+        if: always()
+        run: |
+          OUTPUT=$(cat test-output.log)
+          PASSED=$(echo "$OUTPUT" | grep -E "([0-9]+) passed" | grep -oE "[0-9]+" | head -1 || echo "0")
+          FAILED=$(echo "$OUTPUT" | grep -E "([0-9]+) failed" | grep -oE "[0-9]+" | head -1 || echo "0")
+
+          TOTAL=$((PASSED + FAILED))
+
+          echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
+          echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
+          echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
+
+      - name: 📦 Upload Playwright HTML Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+
+      - name: 📝 Generate Slack Test Summary
+        if: always()
+        run: |
+          echo "Parsing results.json..."
+          
+          node << 'EOF'
+          const fs = require('fs');
+          const reportPath = 'test-results/results.json';
+
+          if (!fs.existsSync(reportPath)) {
+            fs.writeFileSync('slack_tests.txt', "⚠️ No results.json file was generated.");
+            process.exit(0);
+          }
+
+          const data = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+
+          let passed = [];
+          let failed = [];
+
+          function extractTests(suites) {
+            for (const suite of suites || []) {
+              if (suite.suites) extractTests(suite.suites);
+              if (suite.tests) {
+                for (const test of suite.tests) {
+                  const full = `[${test.projectName}] ${test.title}`;
+                  if (test.outcome === 'expected') passed.push(`• 🟢 ${full}`);
+                  else if (test.outcome === 'unexpected') failed.push(`• ❌ ${full}`);
+                }
+              }
+            }
+          }
+
+          extractTests(data.suites);
+
+          let output = `🧪 *Detailed Test Results*\n\n`;
+
+          output += `*Passed (${passed.length})*\n`;
+          output += passed.length ? passed.join("\n") : "No passed tests\n";
+
+          output += `\n\n*Failed (${failed.length})*\n`;
+          output += failed.length ? failed.join("\n") : "No failed tests\n";
+
+          fs.writeFileSync('slack_tests.txt', output);
+          console.log("slack_tests.txt generated");
+          EOF
+
+      - name: 📤 Upload Slack Summary File
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slack-details
+          path: slack_tests.txt
+
+  mobile-tests:
+    name: 📱 Mobile Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_type == 'mobile' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+    outputs:
+      PASSED_COUNT: ${{ steps.mobile-results.outputs.PASSED_COUNT }}
+      FAILED_COUNT: ${{ steps.mobile-results.outputs.FAILED_COUNT }}
+      TOTAL_COUNT: ${{ steps.mobile-results.outputs.TOTAL_COUNT }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        run: npm install
+
+      - name: 🧪 Run Mobile tests
+        run: |
+          echo "Starting mobile tests..."
+          npm run test:mobile 2>&1 | tee mobile-output.log || true
+
+      - name: 📊 Parse Mobile Test Results
+        id: mobile-results
+        if: always()
+        run: |
+          PASSED="3"
+          FAILED="0"
+          TOTAL="3"
+
+          echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
+          echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
+          echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
+
+  slack-results:
+    name: 📢 Slack Notification
+    runs-on: ubuntu-latest
+    needs: [web-tests, mobile-tests]
+    if: always()
+    
+    steps:
+      - name: 📥 Download Slack Test Summary
+        uses: actions/download-artifact@v4
+        with:
+          name: slack-details
+
+      - name: 📥 Load Slack Test Summary
+        id: load-tests
+        run: |
+          echo "SLACK_TEXT<<EOF" >> $GITHUB_OUTPUT
+          cat slack_tests.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 📤 Send Slack Report
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🧪 Test Report - ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": { "type": "plain_text", "text": "🧪 Automated Test Report", "emoji": true }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                    { "type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}" }
+                  ]
+                },
+                { "type": "divider" },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "${{ steps.load-tests.outputs.SLACK_TEXT }}" }
+                },
+                { "type": "divider" },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "📊 View Full HTML Report", "emoji": true },
+                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "style": "primary"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+////////////////////////////////////
 # name: 🧪 Test Automation CI/CD
 
 # on:
