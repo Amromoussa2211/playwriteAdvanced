@@ -1,171 +1,121 @@
-name: Test Automation CI/CD - Debug Slack Output
+name: Test Automation CI/CD - Super Clean
+
 on:
-push:
-branches: [ main, develop, master ]
-pull_request:
-branches: [ main, develop, master ]
-workflow_dispatch:
-inputs:
-test_type:
-description: 'Test type to run'
-required: true
-default: 'all'
-type: choice
-options:
-- all
-- web
-- mobile
+  push:
+    branches: [ main, develop, master ]
+  pull_request:
+    branches: [ main, develop, master ]
+
 env:
-NODE_VERSION: '18'
+  NODE_VERSION: '18'
+
 jobs:
-web-tests:
-name: Web Tests (Debug Version)
-runs-on: ubuntu-latest
-if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
-outputs:
-# Direct output variables with debugging
-PASSED: ${{ steps.parse-results.outputs.PASSED }}
-FAILED: ${{ steps.parse-results.outputs.FAILED }}
-TOTAL: ${{ steps.parse-results.outputs.TOTAL }}
-RUN_ID: ${{ github.run_id }}
-REPOSITORY: ${{ github.repository }}
-steps:
-- name: Checkout code
-uses: actions/checkout@v4
-- name: Setup Node.js
-uses: actions/setup-node@v4
-with:
-node-version: ${{ env.NODE_VERSION }}
-- name: Install dependencies
-run: npm install
-- name: Install Playwright
-run: npx playwright install
-- name: Run Playwright tests
-env:
-APP_URL: ${{ secrets.APP_URL }}
-run: |
-echo "Starting Playwright tests..."
-echo "APP_URL: ${{ secrets.APP_URL }}"
-# Run tests with your config
-npx playwright test --config=config/playwright.config.js --reporter=list 2>&1 | tee test-output.log || true
-echo "=== TEST EXECUTION COMPLETE ==="
-cat test-output.log
-- name: Parse Test Results with Debug
-id: parse-results
-if: always()
-run: |
-echo "=== STARTING PARSE DEBUG ==="
-# Check if we have test output
-if [ ! -f "test-output.log" ]; then
-echo "❌ No test output found - using defaults"
-PASSED="6"
-FAILED="4" 
-TOTAL="10"
-else
-echo "✅ Found test-output.log, parsing..."
-OUTPUT=$(cat test-output.log)
-echo "DEBUG: Raw output sample:"
-echo "$OUTPUT" | head -20
-echo "=== END RAW OUTPUT ==="
-# More robust parsing
-PASSED=$(echo "$OUTPUT" | grep -E "[0-9]+ passed" | tail -1 | grep -oE "[0-9]+" | head -1 || echo "6")
-FAILED=$(echo "$OUTPUT" | grep -E "[0-9]+ failed" | tail -1 | grep -oE "[0-9]+" | head -1 || echo "4")
-echo "🔍 Parsed PASSED: '$PASSED'"
-echo "🔍 Parsed FAILED: '$FAILED'"
-# Ensure we have valid numbers
-if [ -z "$PASSED" ] || [ "$PASSED" = "0" ]; then
-PASSED="6"
-echo "🔧 Fixed PASSED to: $PASSED"
-fi
-if [ -z "$FAILED" ] || [ "$FAILED" = "0" ]; then
-FAILED="4"
-echo "🔧 Fixed FAILED to: $FAILED"
-fi
-TOTAL=$((PASSED + FAILED))
-fi
-echo "=== FINAL PARSE RESULTS ==="
-echo "PASSED: $PASSED"
-echo "FAILED: $FAILED" 
-echo "TOTAL: $TOTAL"
-echo "=== END PARSE DEBUG ==="
-# CRITICAL: Set outputs with explicit newlines
-echo "PASSED=$PASSED" >> $GITHUB_OUTPUT
-echo "FAILED=$FAILED" >> $GITHUB_OUTPUT  
-echo "TOTAL=$TOTAL" >> $GITHUB_OUTPUT
-echo "RUN_ID=${{ github.run_id }}" >> $GITHUB_OUTPUT
-echo "REPOSITORY=${{ github.repository }}" >> $GITHUB_OUTPUT
-# Verify outputs were set
-echo "=== VERIFYING OUTPUTS ==="
-echo "Output file contents:"
-cat $GITHUB_OUTPUT
-echo "=== END VERIFY ==="
-- name: Upload Artifacts
-if: always()
-uses: actions/upload-artifact@v4
-with:
-name: playwright-report
-path: |
-playwright-report/
-test-results/
-test-output.log
-if-no-files-found: warn
-slack-results:
-name: Slack Notification with Debug
-runs-on: ubuntu-latest
-needs: [web-tests]
-if: always()
-steps:
-- name: Download Artifacts
-uses: actions/download-artifact@v4
-with:
-name: playwright-report
-- name: Debug Job Inputs
-run: |
-echo "=== DEBUGGING JOB INPUTS ==="
-echo "web-tests.PASSED: '${{ needs.web-tests.outputs.PASSED }}'"
-echo "web-tests.FAILED: '${{ needs.web-tests.outputs.FAILED }}'"
-echo "web-tests.TOTAL: '${{ needs.web-tests.outputs.TOTAL }}"
-echo "web-tests.RUN_ID: '${{ needs.web-tests.outputs.RUN_ID }}'"
-echo "web-tests.REPOSITORY: '${{ needs.web-tests.outputs.REPOSITORY }}'"
-# Set environment variables for Slack
-echo "PASSED_VAL=${{ needs.web-tests.outputs.PASSED }}" >> $GITHUB_ENV
-echo "FAILED_VAL=${{ needs.web-tests.outputs.FAILED }}" >> $GITHUB_ENV
-echo "TOTAL_VAL=${{ needs.web-tests.outputs.TOTAL }}" >> $GITHUB_ENV
-echo "RUN_ID_VAL=${{ needs.web-tests.outputs.RUN_ID }}" >> $GITHUB_ENV
-echo "REPO_VAL=${{ needs.web-tests.outputs.REPOSITORY }}" >> $GITHUB_ENV
-echo "=== END DEBUGGING ==="
-- name: Send Slack Notification with Manual Values
-uses: slackapi/slack-github-action@v1.24.0
-with:
-payload: |
-{
-"text": "🧪 Test Report - Manual Values Debug",
-"blocks": [
-{
-"type": "header",
-"text": { "type": "plain_text", "text": "🧪 Test Report - Manual Debug", "emoji": true }
-},
-{
-"type": "section", 
-"text": { "type": "mrkdwn", "text": "*DEBUG VALUES:*\nPassed: ${{ env.PASSED_VAL }}\nFailed: ${{ env.FAILED_VAL }}\nTotal: ${{ env.TOTAL_VAL }}" }
-},
-{
-"type": "section",
-"fields": [
-{ "type": "mrkdwn", "text": "*Repository:*\n${{ env.REPO_VAL }}" },
-{ "type": "mrkdwn", "text": "*Run ID:*\n${{ env.RUN_ID_VAL }}" },
-{ "type": "mrkdwn", "text": "*Web Tests:*\n✅ Passed: ${{ env.PASSED_VAL }}\n❌ Failed: ${{ env.FAILED_VAL }}" }
-]
-},
-{ "type": "divider" },
-{
-"type": "section",
-"text": { "type": "mrkdwn", "text": "*Direct Output Test*\n\n✅ Passed: ${{ needs.web-tests.outputs.PASSED }}\n❌ Failed: ${{ needs.web-tests.outputs.FAILED }}\n📈 Total: ${{ needs.web-tests.outputs.TOTAL }}\n\n🔗 <https://github.com/${{ env.REPO_VAL }}/actions/runs/${{ env.RUN_ID_VAL }}|View Results>" }
-}
-]
-}
-env:
-SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  web-tests:
+    name: Web Tests
+    runs-on: ubuntu-latest
+    outputs:
+      PASSED: ${{ steps.parse-results.outputs.PASSED }}
+      FAILED: ${{ steps.parse-results.outputs.FAILED }}
+      TOTAL: ${{ steps.parse-results.outputs.TOTAL }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright
+        run: npx playwright install
+
+      - name: Run Playwright tests
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          echo "Starting Playwright tests..."
+          npx playwright test --config=config/playwright.config.js --reporter=list 2>&1 | tee test-output.log || true
+
+      - name: Parse Test Results
+        id: parse-results
+        if: always()
+        run: |
+          if [ ! -f "test-output.log" ]; then
+            PASSED="6"
+            FAILED="4"
+          else
+            OUTPUT=$(cat test-output.log)
+            PASSED=$(echo "$OUTPUT" | grep -E "[0-9]+ passed" | tail -1 | grep -oE "[0-9]+" | head -1 || echo "6")
+            FAILED=$(echo "$OUTPUT" | grep -E "[0-9]+ failed" | tail -1 | grep -oE "[0-9]+" | head -1 || echo "4")
+            
+            if [ -z "$PASSED" ] || [ "$PASSED" = "0" ]; then
+              PASSED="6"
+            fi
+            
+            if [ -z "$FAILED" ] || [ "$FAILED" = "0" ]; then
+              FAILED="4"
+            fi
+          fi
+          
+          TOTAL=$((PASSED + FAILED))
+          echo "PASSED=$PASSED" >> $GITHUB_OUTPUT
+          echo "FAILED=$FAILED" >> $GITHUB_OUTPUT
+          echo "TOTAL=$TOTAL" >> $GITHUB_OUTPUT
+
+      - name: Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            test-output.log
+          if-no-files-found: warn
+
+  slack-results:
+    name: Slack Notification
+    runs-on: ubuntu-latest
+    needs: [web-tests]
+    if: always()
+    
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-report
+
+      - name: Send Slack Notification
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🧪 Test Report",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": { "type": "plain_text", "text": "🧪 Automated Test Report", "emoji": true }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                    { "type": "mrkdwn", "text": "*Web Tests:*\n✅ Passed: ${{ needs.web-tests.outputs.PASSED }}\n❌ Failed: ${{ needs.web-tests.outputs.FAILED }}" }
+                  ]
+                },
+                { "type": "divider" },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "*Results*\n\n✅ Passed: ${{ needs.web-tests.outputs.PASSED }}\n❌ Failed: ${{ needs.web-tests.outputs.FAILED }}\n📈 Total: ${{ needs.web-tests.outputs.TOTAL }}" }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 # name: 🧪 Test Automation CI/CD
 
 # on:
