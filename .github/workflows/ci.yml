@@ -124,8 +124,7 @@ jobs:
             }
             EOF
           else
-            echo "⚠️ No results.json file was generated.
-HTML report: playwright-report/" > slack_tests.txt
+            echo "⚠️ No results.json file was generated.\nHTML report: playwright-report/" > slack_tests.txt
           fi
 
       - name: 📤 Upload Slack Summary File
@@ -188,16 +187,11 @@ HTML report: playwright-report/" > slack_tests.txt
       - name: 📥 Load Slack Test Summary
         id: load-tests
         run: |
-          # Properly load the Slack text content
+          # Simple approach to load Slack text content
           if [ -f "slack_tests.txt" ]; then
-            # Use printf to properly handle multiline content
-            CONTENT=$(cat slack_tests.txt)
-            {
-              echo "SLACK_TEXT<<EOF"
-              printf "%s" "$CONTENT"
-              echo ""
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
+            # Escape the content for JSON
+            SLACK_CONTENT=$(cat slack_tests.txt | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
+            echo "SLACK_TEXT=$SLACK_CONTENT" >> "$GITHUB_OUTPUT"
           else
             echo "SLACK_TEXT=⚠️ Test summary not available" >> "$GITHUB_OUTPUT"
           fi
