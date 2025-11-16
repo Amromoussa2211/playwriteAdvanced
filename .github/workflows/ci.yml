@@ -84,7 +84,7 @@ jobs:
           
           # Check if test results exist
           if [ -f "test-results/results.json" ]; then
-            node << 'EOF'
+            cat > parse-results.js << 'SCRIPT_EOF'
             const fs = require('fs');
             const reportPath = 'test-results/results.json';
 
@@ -123,7 +123,10 @@ jobs:
               console.error('Error parsing results.json:', error);
               fs.writeFileSync('slack_tests.txt', "⚠️ Error parsing test results.\nCheck the logs for details.");
             }
-            EOF
+            SCRIPT_EOF
+            
+            node parse-results.js
+            rm parse-results.js
           else
             echo "⚠️ No results.json file was generated.\nHTML report: playwright-report/" > slack_tests.txt
           fi
