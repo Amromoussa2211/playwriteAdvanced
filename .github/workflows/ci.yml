@@ -1,269 +1,230 @@
-name: Playwright Tests with Slack Notification
+name: 🧪 Test Automation CI/CD
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, develop, master ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, develop, master ]
   workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - web
+          - mobile
+
+env:
+  NODE_VERSION: '18'
 
 jobs:
   web-tests:
+    name: 🌐 Web Tests
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_type == 'web' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+
+    outputs:
+      PASSED_COUNT: ${{ steps.parse.outputs.PASSED_COUNT }}
+      FAILED_COUNT: ${{ steps.parse.outputs.FAILED_COUNT }}
+      TOTAL_COUNT: ${{ steps.parse.outputs.TOTAL_COUNT }}
+      FAILED_TESTS: ${{ steps.details.outputs.FAILED_TESTS }}
+
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
-        run: |
-          if [ -f package.json ]; then
-            echo "Found package.json, installing dependencies..."
-            if [ -f package-lock.json ]; then
-              echo "Using npm ci (package-lock.json found)"
-              npm ci
-            else
-              echo "Using npm install (no package-lock.json found)"
-              npm install
-            fi
-          else
-            echo "No package.json found, creating basic setup..."
-            npm init -y
-            npm install @playwright/test
-          fi
+      - name: 📦 Install dependencies
+        run: npm install
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+      - name: 🎭 Install Playwright Browsers
+        run: npx playwright install
 
-      - name: Run Playwright tests (Web)
-        run: |
-          if [ -f config/playwright.config.js ]; then
-            npx playwright test tests/web/ -c config/playwright.config.js
-          elif [ -f playwright.config.js ]; then
-            npx playwright test tests/web/ -c playwright.config.js
-          else
-            npx playwright test tests/web/
-          fi
+      - name: 🧪 Run Playwright Tests
         env:
-          CI: true
-        continue-on-error: true
-
-      - name: Run Playwright tests (Mobile)
+          APP_URL: ${{ secrets.APP_URL }}
         run: |
-          if [ -d "tests/mobile" ]; then
-            echo "Running mobile tests..."
-            if [ -f config/playwright.config.js ]; then
-              npx playwright test tests/mobile/ -c config/playwright.config.js
-            elif [ -f playwright.config.js ]; then
-              npx playwright test tests/mobile/ -c playwright.config.js
-            else
-              npx playwright test tests/mobile/
-            fi
-          else
-            echo "No mobile tests directory found, skipping..."
-          fi
-        env:
-          CI: true
-        continue-on-error: true
+          npx playwright test --config=config/playwright.config.js --reporter=line \
+          2>&1 | tee test-output.log || true
 
-      - name: Get commit SHA
-        id: sha
-        run: |
-          echo "short_sha=$(echo ${{ github.sha }} | cut -c1-8)" >> $GITHUB_OUTPUT
-
-      - name: Parse test results
-        id: parse-results
-        run: |
-          echo "=== PARSING TEST RESULTS ==="
-          
-          # Initialize variables
-          PASSED_COUNT=0
-          FAILED_COUNT=0
-          TOTAL_COUNT=0
-          PASSED_TESTS=""
-          FAILED_TESTS=""
-          
-          # Method 1: Try to parse JSON report if it exists
-          if [ -f "test-results/results.json" ]; then
-            echo "✅ Found JSON report"
-            
-            # Extract test titles using jq
-            TITLES=$(jq -r '.. | .title? | select(. != null and . != "" and . != "test")' test-results/results.json 2>/dev/null | sort -u | head -20)
-            
-            if [ -n "$TITLES" ]; then
-              echo "✅ JSON parsing successful"
-              PASSED_TESTS=$(echo "$TITLES" | head -10 | sed 's/^/- /')
-              
-              # Count tests from JSON
-              TOTAL_COUNT=$(echo "$TITLES" | wc -l | tr -d ' ')
-              PASSED_COUNT=$TOTAL_COUNT
-            fi
-          fi
-          
-          # Method 2: Fallback - extract from source files
-          if [ -z "$PASSED_TESTS" ]; then
-            echo "=== USING FALLBACK METHOD ==="
-            
-            # Look for test files
-            TEST_NAMES=""
-            
-            # Search in web tests
-            if [ -d "tests/web" ]; then
-              echo "Searching web tests..."
-              for file in tests/web/*.js tests/web/*.spec.js tests/web/*.test.js; do
-                if [ -f "$file" ]; then
-                  NAMES=$(grep -o "test(['\"][^'\"]{1,50}['\"]" "$file" 2>/dev/null | sed "s/test(['\"]//" | sed "s/['\"]//g" | grep -v '^$' | head -5)
-                  if [ -n "$NAMES" ]; then
-                    if [ -z "$TEST_NAMES" ]; then
-                      TEST_NAMES="$NAMES"
-                    else
-                      TEST_NAMES="$TEST_NAMES"$'\n'"$NAMES"
-                    fi
-                  fi
-                fi
-              done
-            fi
-            
-            # Search in mobile tests
-            if [ -d "tests/mobile" ]; then
-              echo "Searching mobile tests..."
-              for file in tests/mobile/*.js tests/mobile/*.spec.js tests/mobile/*.test.js; do
-                if [ -f "$file" ]; then
-                  NAMES=$(grep -o "test(['\"][^'\"]{1,50}['\"]" "$file" 2>/dev/null | sed "s/test(['\"]//" | sed "s/['\"]//g" | grep -v '^$' | head -5)
-                  if [ -n "$NAMES" ]; then
-                    if [ -z "$TEST_NAMES" ]; then
-                      TEST_NAMES="$NAMES"
-                    else
-                      TEST_NAMES="$TEST_NAMES"$'\n'"$NAMES"
-                    fi
-                  fi
-                fi
-              done
-            fi
-            
-            if [ -n "$TEST_NAMES" ]; then
-              echo "✅ Fallback successful"
-              
-              # Clean and count
-              CLEAN_TEST_NAMES=$(echo "$TEST_NAMES" | grep -v '^$' | sort -u | head -10)
-              PASSED_TESTS=$(echo "$CLEAN_TEST_NAMES" | sed 's/^/- /')
-              TOTAL_COUNT=$(echo "$CLEAN_TEST_NAMES" | wc -l | tr -d ' ')
-              PASSED_COUNT=$TOTAL_COUNT
-            else
-              echo "⚠️ Fallback also failed"
-            fi
-          fi
-          
-          # Final fallback if all methods fail
-          if [ -z "$PASSED_TESTS" ]; then
-            echo "Using sample test names"
-            PASSED_TESTS="- Web Test Case 1"$'\n'"- Web Test Case 2"$'\n'"- Mobile Test Case 1"
-            TOTAL_COUNT=3
-            PASSED_COUNT=3
-          fi
-          
-          # Escape for JSON
-          ESCAPED_PASSED=$(echo "$PASSED_TESTS" | sed 's/"/\\"/g' | sed 's/$/\\n/' | tr -d '\n' | sed 's/\\n$//')
-          
-          echo "Results Summary:"
-          echo "Total: $TOTAL_COUNT"
-          echo "Passed: $PASSED_COUNT" 
-          echo "Failed: $FAILED_COUNT"
-          echo "Test names preview:"
-          echo "$PASSED_TESTS" | head -3
-          
-          # Set outputs
-          echo "total_count=$TOTAL_COUNT" >> $GITHUB_OUTPUT
-          echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
-          echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
-          echo "passed_tests=$ESCAPED_PASSED" >> $GITHUB_OUTPUT
-
-      - name: Send Slack notification
+      - name: 📁 Upload HTML Report
         if: always()
-        uses: 8398a7/action-slack@v3
+        uses: actions/upload-artifact@v4
         with:
-          status: ${{ job.status }}
-          channel: '#test-notifications'
-          fields: repo,message,commit,author,action,eventName,ref,workflow
-          custom_payload: |
+          name: playwright-html-report
+          path: playwright-report
+
+      - name: 📊 Parse Summary Counts
+        id: parse
+        if: always()
+        run: |
+          OUTPUT=$(cat test-output.log)
+
+          PASSED=$(echo "$OUTPUT" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | head -1 || echo 0)
+          FAILED=$(echo "$OUTPUT" | grep -Eo "[0-9]+ failed" | grep -Eo "[0-9]+" | head -1 || echo 0)
+          
+          TOTAL=$((PASSED + FAILED))
+
+          echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
+          echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
+          echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
+
+      - name: 🔍 Extract Failed Test Names
+        id: details
+        if: always()
+        run: |
+          if [ -f test-results/results.json ]; then
+            FAILED_TESTS=$(jq -r '.suites[].specs[] 
+              | select(.tests[].status=="failed") 
+              | .title' test-results/results.json | sed ':a;N;$!ba;s/\n/\\n/g')
+
+            if [ -z "$FAILED_TESTS" ]; then FAILED_TESTS="No failed tests 🎉"; fi
+          else
+            FAILED_TESTS="results.json not found"
+          fi
+
+          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_OUTPUT
+
+  mobile-tests:
+    name: 📱 Mobile Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_type == 'mobile' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == '' }}
+
+    outputs:
+      PASSED_COUNT: ${{ steps.parse.outputs.PASSED_COUNT }}
+      FAILED_COUNT: ${{ steps.parse.outputs.FAILED_COUNT }}
+      TOTAL_COUNT: ${{ steps.parse.outputs.TOTAL_COUNT }}
+      FAILED_TESTS: ${{ steps.details.outputs.FAILED_TESTS }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        run: npm install
+
+      - name: 🧪 Run Mobile Tests (Appium)
+        run: |
+          npm run test:mobile 2>&1 | tee mobile-output.log || true
+
+      - name: 📊 Parse Mobile Test Results
+        id: parse
+        if: always()
+        run: |
+          PASSED=$(grep -Eo "[0-9]+ passed" mobile-output.log | grep -Eo "[0-9]+" | head -1 || echo 0)
+          FAILED=$(grep -Eo "[0-9]+ failed" mobile-output.log | grep -Eo "[0-9]+" | head -1 || echo 0)
+
+          TOTAL=$((PASSED + FAILED))
+
+          echo "PASSED_COUNT=$PASSED" >> $GITHUB_OUTPUT
+          echo "FAILED_COUNT=$FAILED" >> $GITHUB_OUTPUT
+          echo "TOTAL_COUNT=$TOTAL" >> $GITHUB_OUTPUT
+
+      - name: 🔍 Extract Mobile Failed Test Names
+        id: details
+        if: always()
+        run: |
+          FAILED_TESTS=$(grep -E "FAIL|Error|AssertionError" -n mobile-output.log | sed ':a;N;$!ba;s/\n/\\n/g')
+          if [ -z "$FAILED_TESTS" ]; then FAILED_TESTS="No failed tests 🎉"; fi
+          echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_OUTPUT
+
+  slack-results:
+    name: 📢 Slack Notification
+    runs-on: ubuntu-latest
+    needs: [web-tests, mobile-tests]
+    if: always()
+
+    steps:
+      - name: 📊 Prepare Final Summary
+        id: summary
+        run: |
+          WEB_PASSED=${{ needs.web-tests.outputs.PASSED_COUNT || 0 }}
+          WEB_FAILED=${{ needs.web-tests.outputs.FAILED_COUNT || 0 }}
+          WEB_TOTAL=${{ needs.web-tests.outputs.TOTAL_COUNT || 0 }}
+          WEB_FAILED_LIST="${{ needs.web-tests.outputs.FAILED_TESTS }}"
+
+          MOBILE_PASSED=${{ needs.mobile-tests.outputs.PASSED_COUNT || 0 }}
+          MOBILE_FAILED=${{ needs.mobile-tests.outputs.FAILED_COUNT || 0 }}
+          MOBILE_TOTAL=${{ needs.mobile-tests.outputs.TOTAL_COUNT || 0 }}
+          MOBILE_FAILED_LIST="${{ needs.mobile-tests.outputs.FAILED_TESTS }}"
+
+          echo "WEB_FAILED_LIST=$WEB_FAILED_LIST" >> $GITHUB_OUTPUT
+          echo "MOBILE_FAILED_LIST=$MOBILE_FAILED_LIST" >> $GITHUB_OUTPUT
+
+      - name: 📤 Send Slack Report
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
             {
-              "text": "Playwright Test Results - ${{ job.status }}",
               "blocks": [
                 {
                   "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "🧪 Playwright Test Results - ${{ job.status }}"
-                  }
+                  "text": { "type": "plain_text", "text": "🧪 Automated Test Report", "emoji": true }
                 },
                 {
                   "type": "section",
                   "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Repository:* ${{ github.repository }}"
-                    },
-                    {
-                      "type": "mrkdwn", 
-                      "text": "*Branch:* ${{ github.ref_name }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Commit:* ${{ steps.sha.outputs.short_sha }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Total Tests:* ${{ steps.parse-results.outputs.total_count }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Passed:* ${{ steps.parse-results.outputs.passed_count }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Failed:* ${{ steps.parse-results.outputs.failed_count }}"
-                    }
+                    { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                    { "type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}" }
                   ]
+                },
+                { "type": "divider" },
+
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "*🌐 Web Test Summary:*\n✅ ${{ needs.web-tests.outputs.PASSED_COUNT }} Passed\n❌ ${{ needs.web-tests.outputs.FAILED_COUNT }} Failed\n📋 ${{ needs.web-tests.outputs.TOTAL_COUNT }} Total" }
                 },
                 {
                   "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Test Cases:*\n${{ steps.parse-results.outputs.passed_tests }}"
-                  }
+                  "text": { "type": "mrkdwn", "text": "*❌ Web Failed Tests:*\n${{ steps.summary.outputs.WEB_FAILED_LIST }}" }
                 },
+
+                { "type": "divider" },
+
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "*📱 Mobile Test Summary:*\n✅ ${{ needs.mobile-tests.outputs.PASSED_COUNT }} Passed\n❌ ${{ needs.mobile-tests.outputs.FAILED_COUNT }} Failed\n📋 ${{ needs.mobile-tests.outputs.TOTAL_COUNT }} Total" }
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "*❌ Mobile Failed Tests:*\n${{ steps.summary.outputs.MOBILE_FAILED_LIST }}" }
+                },
+
+                { "type": "divider" },
+
                 {
                   "type": "actions",
                   "elements": [
                     {
                       "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View Details"
-                      },
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                      "text": { "type": "plain_text", "text": "📄 Download HTML Report", "emoji": true },
+                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts",
+                      "style": "primary"
+                    },
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "📊 Open CI Run", "emoji": true },
+                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                     }
                   ]
                 }
               ]
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: |
-            test-results/
-            playwright-report/
-          retention-days: 30
           
 # name: 🧪 Test Automation CI/CD
 
