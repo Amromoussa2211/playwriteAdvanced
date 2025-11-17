@@ -311,7 +311,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*TC detailed*\\n$TEST_DETAILS"
+                  "text": "*TC detailed*\n$TEST_DETAILS"
                 }
               },
               {
