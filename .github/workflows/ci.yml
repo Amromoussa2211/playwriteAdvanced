@@ -201,7 +201,7 @@ jobs:
           HTML_REPORT_LINK="https://github.com/$REPO_NAME/actions/runs/$RUN_ID"
           
           # Add links to test details
-          TEST_DETAILS=$(printf "%s\n\n📊 *Reports:*\n• <$ACTIONS_LINK|View GitHub Actions Log>\n• <$HTML_REPORT_LINK/artifacts|Download HTML Report>" "$TEST_DETAILS")
+          TEST_DETAILS=$(printf "%s\n\n📊 *Reports:*\n• <$ACTIONS_LINK|View Execution Log>\n• <$HTML_REPORT_LINK/|Download HTML Report>" "$TEST_DETAILS")
           
           # Determine overall status
           if [ "$TOTAL_TESTS" -eq 0 ]; then
