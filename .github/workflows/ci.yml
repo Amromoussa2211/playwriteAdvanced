@@ -38,8 +38,8 @@ jobs:
           echo "Starting Playwright Tests"
           echo "========================================="
           
-          # Run tests with BOTH list reporter (to console) and JSON reporter
-          npx playwright test --reporter=list,json 2>&1 | tee test-console.log
+          # Run tests with list reporter to console
+          npx playwright test --reporter=list 2>&1 | tee test-console.log
           
           TEST_EXIT_CODE=${PIPESTATUS[0]}
           echo ""
@@ -47,8 +47,13 @@ jobs:
           echo "Test execution completed with exit code: $TEST_EXIT_CODE"
           echo "========================================="
           
-          # Store exit code for later
+          # Store exit code
           echo $TEST_EXIT_CODE > test-exit-code.txt
+          
+          # Also capture the full console output for debugging
+          echo ""
+          echo "Full test output:"
+          cat test-console.log
 
       - name: Parse test results and send Slack notification
         if: always()
@@ -69,39 +74,60 @@ jobs:
           # Check if we have test console log
           if [ ! -f "test-console.log" ]; then
             echo "ERROR: No test console log found"
-            FAILED_LIST="- :x: Test execution log not found"
+            TEST_DETAILS="- :x: Test execution log not found"
           else
             echo "Parsing test results from console output..."
+            echo ""
             
-            # Parse console output for test results
-            # Playwright list reporter shows:
-            #   ✓ [browser] › file › test name (time)
-            #   ✗ [browser] › file › test name (time)
+            # Debug: Show what we're looking for
+            echo "Looking for test result lines..."
+            echo "Lines with checkmarks or X symbols:"
+            grep -E "✓|✗|×" test-console.log || echo "No symbols found"
+            echo ""
             
-            # Extract FAILED tests (with ✗ or ×)
-            FAILED_LIST=$(grep -E "^\s*[✗×]" test-console.log | while read line; do
-              # Remove leading whitespace and the symbol
+            # Extract FAILED tests - look for lines with X symbols (✗ or ×)
+            # These appear at the START of the line after whitespace
+            echo "Extracting FAILED tests..."
+            FAILED_LIST=$(grep -E "^[[:space:]]*(✗|×)" test-console.log 2>/dev/null | while IFS= read -r line; do
+              # Remove leading whitespace and the X symbol
               clean_line=$(echo "$line" | sed 's/^[[:space:]]*//' | sed 's/^[✗×][[:space:]]*//')
-              # Add Slack emoji
               echo "- :x: $clean_line"
             done)
             
-            # Extract PASSED tests (with ✓)
-            PASSED_LIST=$(grep -E "^\s*✓" test-console.log | while read line; do
-              # Remove leading whitespace and the symbol
+            if [ -n "$FAILED_LIST" ]; then
+              echo "Found failed tests:"
+              echo "$FAILED_LIST"
+            else
+              echo "No failed tests found in output"
+            fi
+            echo ""
+            
+            # Extract PASSED tests - look for lines with checkmark (✓)
+            echo "Extracting PASSED tests..."
+            PASSED_LIST=$(grep -E "^[[:space:]]*✓" test-console.log 2>/dev/null | while IFS= read -r line; do
+              # Remove leading whitespace and the checkmark
               clean_line=$(echo "$line" | sed 's/^[[:space:]]*//' | sed 's/^✓[[:space:]]*//')
-              # Add Slack emoji
               echo "- :white_check_mark: $clean_line"
             done)
             
-            # Count tests from summary line
+            if [ -n "$PASSED_LIST" ]; then
+              echo "Found passed tests:"
+              echo "$PASSED_LIST"
+            else
+              echo "No passed tests found in output"
+            fi
+            echo ""
+            
+            # Count tests from summary line (more reliable)
+            echo "Extracting test counts from summary..."
             if grep -qE "[0-9]+ (passed|failed)" test-console.log; then
               PASSED_TESTS=$(grep -oP '(\d+) passed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
               FAILED_TESTS=$(grep -oP '(\d+) failed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
               TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
               
-              echo "Found: Total=$TOTAL_TESTS, Passed=$PASSED_TESTS, Failed=$FAILED_TESTS"
+              echo "Summary found: Total=$TOTAL_TESTS, Passed=$PASSED_TESTS, Failed=$FAILED_TESTS"
             else
+              echo "No summary line found, counting from lists..."
               # Fallback: count from extracted lists
               if [ -n "$FAILED_LIST" ]; then
                 FAILED_TESTS=$(echo "$FAILED_LIST" | grep -c "^- :x:" || echo "0")
@@ -110,30 +136,42 @@ jobs:
                 PASSED_TESTS=$(echo "$PASSED_LIST" | grep -c "^- :white_check_mark:" || echo "0")
               fi
               TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
+              echo "Counted: Total=$TOTAL_TESTS, Passed=$PASSED_TESTS, Failed=$FAILED_TESTS"
             fi
-            
-            echo "Parsed: $FAILED_TESTS failed, $PASSED_TESTS passed"
           fi
+          
+          echo ""
+          echo "========================================="
+          echo "Building notification message..."
+          echo "========================================="
           
           # Combine test details: FAILED FIRST, then PASSED
           TEST_DETAILS=""
           
+          # Add failed tests first
           if [ -n "$FAILED_LIST" ] && [ "$FAILED_LIST" != "" ]; then
             TEST_DETAILS="$FAILED_LIST"
-            echo "Added $(echo "$FAILED_LIST" | wc -l) failed tests to output"
+            echo "Added $(echo "$FAILED_LIST" | grep -c "^- :x:") failed tests"
+          else
+            if [ "$FAILED_TESTS" -gt 0 ]; then
+              # We know there are failed tests but couldn't extract details
+              TEST_DETAILS="- :x: $FAILED_TESTS test(s) failed - check GitHub Actions logs for details"
+              echo "Failed tests counted but details not extracted"
+            fi
           fi
           
+          # Add passed tests after
           if [ -n "$PASSED_LIST" ] && [ "$PASSED_LIST" != "" ]; then
             if [ -n "$TEST_DETAILS" ]; then
-              # Add blank line between failed and passed
+              # Add blank line separator
               TEST_DETAILS=$(printf "%s\n\n%s" "$TEST_DETAILS" "$PASSED_LIST")
             else
               TEST_DETAILS="$PASSED_LIST"
             fi
-            echo "Added $(echo "$PASSED_LIST" | wc -l) passed tests to output"
+            echo "Added $(echo "$PASSED_LIST" | grep -c "^- :white_check_mark:") passed tests"
           fi
           
-          # If no details extracted, provide fallback
+          # If no details at all, provide fallback
           if [ -z "$TEST_DETAILS" ] || [ "$TEST_DETAILS" == "" ]; then
             if [ "$TOTAL_TESTS" -gt 0 ]; then
               TEST_DETAILS="$TOTAL_TESTS tests completed. Check GitHub Actions logs for details."
@@ -141,6 +179,13 @@ jobs:
               TEST_DETAILS="No test results found. Check GitHub Actions logs."
             fi
           fi
+          
+          # Add HTML report link
+          RUN_ID="${GITHUB_RUN_ID}"
+          REPO="${GITHUB_REPOSITORY}"
+          HTML_REPORT_LINK="https://github.com/$REPO/actions/runs/$RUN_ID"
+          
+          TEST_DETAILS=$(printf "%s\n\n:link: <$HTML_REPORT_LINK|View full report in GitHub Actions>" "$TEST_DETAILS")
           
           # Get git information
           REPO_NAME="${GITHUB_REPOSITORY}"
@@ -162,9 +207,6 @@ jobs:
             STATUS_COLOR="#36a64f"
           fi
           
-          # Escape for JSON
-          TEST_DETAILS_ESCAPED=$(echo "$TEST_DETAILS" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-          
           echo ""
           echo "Final Summary:"
           echo "  Status: $STATUS_TEXT"
@@ -172,6 +214,9 @@ jobs:
           echo "  Passed: $PASSED_TESTS"
           echo "  Failed: $FAILED_TESTS"
           echo ""
+          
+          # Escape for JSON
+          TEST_DETAILS_ESCAPED=$(echo "$TEST_DETAILS" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
           
           # Create Slack message
           SLACK_MESSAGE=$(cat << EOF
@@ -237,13 +282,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-console-log
-          path: test-console.log
-          retention-days: 30
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
@@ -251,9 +289,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
-          path: test-results/
+          name: test-console-log
+          path: test-console.log
           retention-days: 30
+
 
 
 # name: Playwright Tests with Slack Notification - FIXED
