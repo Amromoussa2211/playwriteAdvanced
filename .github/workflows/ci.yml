@@ -24,9 +24,9 @@ jobs:
       run: npm install || echo "npm install failed, trying npm ci"
       continue-on-error: true
     
-    - name: Try npm ci if install failed
-      if: failure()
-      run: npm ci
+    # - name: Try npm ci if install failed
+    #   if: failure()
+    #   run: npm ci
     
     - name: Install Playwright
       run: npx playwright install --with-deps
@@ -165,7 +165,6 @@ jobs:
           fi
         else
           echo "⚠️ SLACK_WEBHOOK_URL not configured in repository secrets"
-        fi
         fi
 # name: Playwright Tests with Slack Notification - FIXED
 
