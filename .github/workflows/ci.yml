@@ -166,6 +166,7 @@ jobs:
         else
           echo "⚠️ SLACK_WEBHOOK_URL not configured in repository secrets"
         fi
+        fi
 # name: Playwright Tests with Slack Notification - FIXED
 
 # on:
