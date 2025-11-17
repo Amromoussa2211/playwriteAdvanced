@@ -37,26 +37,48 @@ jobs:
           npx playwright test --reporter=json > test-output.json 2>&1 || true
           echo "Tests completed"
 
-      - name: Debug - Check test results files
+      - name: Debug - Show JSON structure
         if: always()
         run: |
-          echo "=== Checking for test results files ==="
-          ls -la || true
-          ls -la test-results/ || echo "test-results directory not found"
-          ls -la playwright-report/ || echo "playwright-report directory not found"
+          echo "=== JSON File Size ==="
+          ls -lh test-output.json || echo "File not found"
           
           echo ""
-          echo "=== Checking test-output.json ==="
-          if [ -f "test-output.json" ]; then
-            echo "test-output.json exists"
-            cat test-output.json
+          echo "=== First 200 lines of JSON ==="
+          head -200 test-output.json || echo "Cannot read file"
+          
+          echo ""
+          echo "=== JSON Structure Analysis ==="
+          if jq empty test-output.json 2>/dev/null; then
+            echo "Valid JSON"
+            echo ""
+            echo "Top-level keys:"
+            jq -r 'keys[]' test-output.json 2>/dev/null || echo "Cannot extract keys"
+            echo ""
+            echo "Number of suites:"
+            jq '.suites | length' test-output.json 2>/dev/null || echo "Cannot count suites"
+            echo ""
+            echo "Suite structure (first suite):"
+            jq '.suites[0] | keys' test-output.json 2>/dev/null || echo "Cannot extract suite keys"
+            echo ""
+            echo "All test results with status:"
+            jq -r '
+              def walk_specs:
+                if .specs then
+                  .specs[] | 
+                  .title as $title |
+                  (.tests[]? | 
+                    "Test: \($title) | Project: \(.projectName // "none") | Status: \(.status // "unknown")"
+                  )
+                else empty end,
+                if .suites then .suites[] | walk_specs else empty end
+              ;
+              .suites[]? | walk_specs
+            ' test-output.json 2>/dev/null || echo "Cannot walk specs"
           else
-            echo "test-output.json not found"
+            echo "Invalid JSON, showing raw content:"
+            cat test-output.json | head -50
           fi
-          
-          echo ""
-          echo "=== Checking for JSON results ==="
-          find . -name "*.json" -type f | head -20
 
       - name: Parse test results and send Slack notification
         if: always()
@@ -70,152 +92,106 @@ jobs:
           PASSED_TESTS=0
           FAILED_TESTS=0
           TEST_DETAILS=""
-          PARSE_ERROR=""
           
-          # Function to try parsing from test-output.json (direct playwright output)
-          parse_from_output_json() {
-            if [ -f "test-output.json" ]; then
-              echo "Attempting to parse test-output.json..."
-              
-              # Check if file has valid JSON
-              if jq empty test-output.json 2>/dev/null; then
-                echo "Valid JSON found in test-output.json"
-                
-                # Try to extract test results
-                TOTAL_TESTS=$(jq -r '.suites[].specs | length' test-output.json 2>/dev/null | awk '{sum+=$1} END {print sum}' || echo "0")
-                
-                if [ "$TOTAL_TESTS" -gt 0 ]; then
-                  echo "Found $TOTAL_TESTS tests in test-output.json"
-                  
-                  # Extract failed tests
-                  FAILED_DETAILS=$(jq -r '
-                    .suites[]? | 
-                    .specs[]? as $spec | 
-                    .file as $file |
-                    $spec.tests[]? | 
-                    select(.status == "failed" or .status == "timedOut") | 
-                    "- :x: [\(.projectName // "unknown")] " + ($spec.title // $file // "Unknown Test")
-                  ' test-output.json 2>/dev/null | sort -u)
-                  
-                  FAILED_TESTS=$(echo "$FAILED_DETAILS" | grep -c "^- :x:" || echo "0")
-                  
-                  # Extract passed tests
-                  PASSED_DETAILS=$(jq -r '
-                    .suites[]? | 
-                    .specs[]? as $spec | 
-                    .file as $file |
-                    $spec.tests[]? | 
-                    select(.status == "passed" or .status == "expected") | 
-                    "- :white_check_mark: [\(.projectName // "unknown")] " + ($spec.title // $file // "Unknown Test")
-                  ' test-output.json 2>/dev/null | sort -u)
-                  
-                  PASSED_TESTS=$(echo "$PASSED_DETAILS" | grep -c "^- :white_check_mark:" || echo "0")
-                  
-                  # Combine details (failed first)
-                  if [ -n "$FAILED_DETAILS" ] && [ -n "$PASSED_DETAILS" ]; then
-                    TEST_DETAILS=$(printf "%s\n%s" "$FAILED_DETAILS" "$PASSED_DETAILS")
-                  elif [ -n "$FAILED_DETAILS" ]; then
-                    TEST_DETAILS="$FAILED_DETAILS"
-                  elif [ -n "$PASSED_DETAILS" ]; then
-                    TEST_DETAILS="$PASSED_DETAILS"
-                  fi
-                  
-                  return 0
-                fi
-              else
-                echo "test-output.json is not valid JSON"
-              fi
-            fi
-            return 1
-          }
-          
-          # Function to try parsing from test-results directory
-          parse_from_test_results() {
-            if [ -d "test-results" ]; then
-              echo "Checking test-results directory..."
-              
-              # Look for results.json
-              if [ -f "test-results/results.json" ]; then
-                echo "Found test-results/results.json"
-                
-                if jq empty test-results/results.json 2>/dev/null; then
-                  TOTAL_TESTS=$(jq -r '.suites[].specs | length' test-results/results.json 2>/dev/null | awk '{sum+=$1} END {print sum}' || echo "0")
-                  
-                  if [ "$TOTAL_TESTS" -gt 0 ]; then
-                    # Same parsing logic as above
-                    FAILED_DETAILS=$(jq -r '
-                      .suites[]? | 
-                      .specs[]? as $spec | 
-                      .file as $file |
-                      $spec.tests[]? | 
-                      select(.status == "failed" or .status == "timedOut") | 
-                      "- :x: [\(.projectName // "unknown")] " + ($spec.title // $file // "Unknown Test")
-                    ' test-results/results.json 2>/dev/null | sort -u)
-                    
-                    FAILED_TESTS=$(echo "$FAILED_DETAILS" | grep -c "^- :x:" || echo "0")
-                    
-                    PASSED_DETAILS=$(jq -r '
-                      .suites[]? | 
-                      .specs[]? as $spec | 
-                      .file as $file |
-                      $spec.tests[]? | 
-                      select(.status == "passed" or .status == "expected") | 
-                      "- :white_check_mark: [\(.projectName // "unknown")] " + ($spec.title // $file // "Unknown Test")
-                    ' test-results/results.json 2>/dev/null | sort -u)
-                    
-                    PASSED_TESTS=$(echo "$PASSED_DETAILS" | grep -c "^- :white_check_mark:" || echo "0")
-                    
-                    if [ -n "$FAILED_DETAILS" ] && [ -n "$PASSED_DETAILS" ]; then
-                      TEST_DETAILS=$(printf "%s\n%s" "$FAILED_DETAILS" "$PASSED_DETAILS")
-                    elif [ -n "$FAILED_DETAILS" ]; then
-                      TEST_DETAILS="$FAILED_DETAILS"
-                    elif [ -n "$PASSED_DETAILS" ]; then
-                      TEST_DETAILS="$PASSED_DETAILS"
-                    fi
-                    
-                    return 0
-                  fi
-                fi
-              fi
-            fi
-            return 1
-          }
-          
-          # Function to parse from console output as fallback
-          parse_from_console() {
-            echo "Attempting to parse from console output..."
+          # Check if JSON file exists and is valid
+          if [ ! -f "test-output.json" ]; then
+            echo "ERROR: test-output.json not found"
+            TEST_DETAILS="- :x: Test output file not found"
+          elif ! jq empty test-output.json 2>/dev/null; then
+            echo "ERROR: Invalid JSON in test-output.json"
+            TEST_DETAILS="- :x: Invalid JSON output from Playwright"
+          else
+            echo "Valid JSON found, parsing..."
             
-            # Try to get test summary from the test output
-            if [ -f "test-output.json" ]; then
-              # Sometimes Playwright outputs text before/after JSON
-              SUMMARY=$(cat test-output.json | grep -E "([0-9]+) passed.*([0-9]+) failed|([0-9]+) failed.*([0-9]+) passed" | head -1)
+            # Parse all tests recursively from nested suites
+            # Playwright JSON can have nested suites structure
+            ALL_TESTS=$(jq -r '
+              def walk_specs:
+                if .specs then
+                  .specs[] | 
+                  .title as $spec_title |
+                  .file as $file |
+                  (.tests[]? | 
+                    {
+                      title: $spec_title,
+                      project: (.projectName // .projectId // "default"),
+                      status: (.status // "unknown"),
+                      file: $file
+                    }
+                  )
+                else empty end,
+                if .suites then .suites[] | walk_specs else empty end
+              ;
+              [.suites[]? | walk_specs]
+            ' test-output.json 2>/dev/null)
+            
+            echo "Raw test data:"
+            echo "$ALL_TESTS" | head -50
+            
+            # Count total tests
+            TOTAL_TESTS=$(echo "$ALL_TESTS" | jq 'length' 2>/dev/null || echo "0")
+            echo "Total tests found: $TOTAL_TESTS"
+            
+            if [ "$TOTAL_TESTS" -gt 0 ]; then
+              # Extract failed tests
+              FAILED_LIST=$(echo "$ALL_TESTS" | jq -r '
+                .[] | 
+                select(.status == "failed" or .status == "timedOut" or .status == "interrupted") |
+                "- :x: [\(.project)] \(.title)"
+              ' 2>/dev/null)
               
-              if [ -n "$SUMMARY" ]; then
-                echo "Found summary: $SUMMARY"
-                
-                PASSED_TESTS=$(echo "$SUMMARY" | grep -oP '(\d+) passed' | grep -oP '\d+' || echo "0")
-                FAILED_TESTS=$(echo "$SUMMARY" | grep -oP '(\d+) failed' | grep -oP '\d+' || echo "0")
-                TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
-                
-                if [ "$TOTAL_TESTS" -gt 0 ]; then
-                  TEST_DETAILS="Summary extracted from console output:\n- Tests were run but detailed results parsing failed\n- Check the GitHub Actions logs for full details"
-                  return 0
+              # Extract passed tests
+              PASSED_LIST=$(echo "$ALL_TESTS" | jq -r '
+                .[] | 
+                select(.status == "passed" or .status == "expected") |
+                "- :white_check_mark: [\(.project)] \(.title)"
+              ' 2>/dev/null)
+              
+              # Extract skipped tests
+              SKIPPED_LIST=$(echo "$ALL_TESTS" | jq -r '
+                .[] | 
+                select(.status == "skipped") |
+                "- :fast_forward: [\(.project)] \(.title) (skipped)"
+              ' 2>/dev/null)
+              
+              # Count each type
+              FAILED_TESTS=$(echo "$ALL_TESTS" | jq '[.[] | select(.status == "failed" or .status == "timedOut" or .status == "interrupted")] | length' 2>/dev/null || echo "0")
+              PASSED_TESTS=$(echo "$ALL_TESTS" | jq '[.[] | select(.status == "passed" or .status == "expected")] | length' 2>/dev/null || echo "0")
+              SKIPPED_TESTS=$(echo "$ALL_TESTS" | jq '[.[] | select(.status == "skipped")] | length' 2>/dev/null || echo "0")
+              
+              echo "Passed: $PASSED_TESTS"
+              echo "Failed: $FAILED_TESTS"
+              echo "Skipped: $SKIPPED_TESTS"
+              
+              # Combine test details (failed first, then passed, then skipped)
+              TEST_DETAILS=""
+              if [ -n "$FAILED_LIST" ] && [ "$FAILED_LIST" != "" ]; then
+                TEST_DETAILS="$FAILED_LIST"
+              fi
+              
+              if [ -n "$PASSED_LIST" ] && [ "$PASSED_LIST" != "" ]; then
+                if [ -n "$TEST_DETAILS" ]; then
+                  TEST_DETAILS=$(printf "%s\n%s" "$TEST_DETAILS" "$PASSED_LIST")
+                else
+                  TEST_DETAILS="$PASSED_LIST"
                 fi
               fi
-            fi
-            return 1
-          }
-          
-          # Try parsing methods in order
-          if ! parse_from_output_json; then
-            echo "Failed to parse from test-output.json, trying test-results..."
-            if ! parse_from_test_results; then
-              echo "Failed to parse from test-results, trying console output..."
-              if ! parse_from_console; then
-                echo "All parsing methods failed"
-                PARSE_ERROR="Unable to parse test results from any source"
-                TEST_DETAILS="- :x: Failed to parse test results - check JSON reporter configuration"
+              
+              if [ -n "$SKIPPED_LIST" ] && [ "$SKIPPED_LIST" != "" ]; then
+                if [ -n "$TEST_DETAILS" ]; then
+                  TEST_DETAILS=$(printf "%s\n%s" "$TEST_DETAILS" "$SKIPPED_LIST")
+                else
+                  TEST_DETAILS="$SKIPPED_LIST"
+                fi
               fi
+              
+              # If still empty, provide default message
+              if [ -z "$TEST_DETAILS" ] || [ "$TEST_DETAILS" == "" ]; then
+                TEST_DETAILS="- Tests completed but details could not be extracted"
+              fi
+            else
+              echo "No tests found in JSON"
+              TEST_DETAILS="- :warning: No tests found in output"
             fi
           fi
           
@@ -229,6 +205,10 @@ jobs:
             STATUS_EMOJI=":x:"
             STATUS_TEXT="Failed"
             STATUS_COLOR="#FF0000"
+          elif [ "$TOTAL_TESTS" -eq 0 ]; then
+            STATUS_EMOJI=":warning:"
+            STATUS_TEXT="No Tests Found"
+            STATUS_COLOR="#FFA500"
           else
             STATUS_EMOJI=":white_check_mark:"
             STATUS_TEXT="Passed"
@@ -296,7 +276,7 @@ jobs:
           
           echo ""
           echo "=== Notification sent ==="
-          echo "Total: $TOTAL_TESTS | Passed: $PASSED_TESTS | Failed: $FAILED_TESTS"
+          echo "Summary: Total=$TOTAL_TESTS | Passed=$PASSED_TESTS | Failed=$FAILED_TESTS"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -310,6 +290,13 @@ jobs:
         with:
           name: test-results
           path: test-results/
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-output-json
+          path: test-output.json
           retention-days: 30
 
 
