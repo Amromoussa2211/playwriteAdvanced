@@ -1,303 +1,310 @@
-name: Playwright Tests with Slack Notification
+name: Playwright Tests
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [master, main]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [master, main]
 
 jobs:
-  web-tests:
+  test:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: lts/*
 
       - name: Install dependencies
-        run: |
-          if [ -f package.json ]; then
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-            fi
-          else
-            npm init -y
-            npm install @playwright/test
-          fi
+        run: npm ci
 
-      - name: Install Playwright browsers
+      - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
       - name: Run Playwright tests
+        id: playwright_tests
         continue-on-error: true
         run: |
-          if [ -f config/playwright.config.js ]; then
-            npx playwright test -c config/playwright.config.js
-          elif [ -f playwright.config.js ]; then
-            npx playwright test -c playwright.config.js
+          npx playwright test --reporter=json > test-output.json 2>&1 || true
+          echo "Tests completed"
+
+      - name: Debug - Check test results files
+        if: always()
+        run: |
+          echo "=== Checking for test results files ==="
+          ls -la || true
+          ls -la test-results/ || echo "test-results directory not found"
+          ls -la playwright-report/ || echo "playwright-report directory not found"
+          
+          echo ""
+          echo "=== Checking test-output.json ==="
+          if [ -f "test-output.json" ]; then
+            echo "test-output.json exists"
+            cat test-output.json
           else
-            npx playwright test
+            echo "test-output.json not found"
           fi
+          
+          echo ""
+          echo "=== Checking for JSON results ==="
+          find . -name "*.json" -type f | head -20
+
+      - name: Parse test results and send Slack notification
+        if: always()
         env:
-          CI: true
-
-      - name: Parse and set test data
-        id: get-test-data
-        if: always()
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          echo "🏗️ Getting commit SHA..."
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
-          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          echo "SHORT_SHA=$SHORT_SHA"
+          echo "=== Starting test results parsing ==="
           
-          echo "📊 Parsing actual test results from JSON report..."
-          
-          # Initialize counters
-          PASSED_COUNT=0
-          FAILED_COUNT=0
-          TOTAL_COUNT=0
+          # Initialize variables
+          TOTAL_TESTS=0
+          PASSED_TESTS=0
+          FAILED_TESTS=0
           TEST_DETAILS=""
+          PARSE_ERROR=""
           
-          # Check if JSON results exist
-          if [ -f "test-results/results.json" ]; then
-            echo "✅ Found test-results/results.json"
-            
-            # Parse test counts using jq
-            PASSED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="passed" or .status=="expected")] | length' test-results/results.json 2>/dev/null || echo "0")
-            FAILED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="failed" or .status=="timedOut")] | length' test-results/results.json 2>/dev/null || echo "0")
-            TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
-            
-            echo "📊 Test Results:"
-            echo "   Total: $TOTAL_COUNT"
-            echo "   Passed: $PASSED_COUNT"
-            echo "   Failed: $FAILED_COUNT"
-            
-            # Extract FAILED tests first (with browser info)
-            if [ "$FAILED_COUNT" -gt 0 ]; then
-              echo "❌ Extracting failed tests..."
+          # Function to try parsing from test-output.json (direct playwright output)
+          parse_from_output_json() {
+            if [ -f "test-output.json" ]; then
+              echo "Attempting to parse test-output.json..."
               
-              # Get failed test details with project (browser) name and format directly
-              FAILED_DETAILS=$(jq -r '
-                .suites[].specs[] as $spec |
-                $spec.tests[] |
-                select(.status=="failed" or .status=="timedOut") |
-                "- :x: [\(.projectName // "unknown")] › \($spec.title // "Unknown Test")"
-              ' test-results/results.json 2>/dev/null || echo "")
-              
-              if [ -n "$FAILED_DETAILS" ]; then
-                TEST_DETAILS="${TEST_DETAILS}${FAILED_DETAILS}\n"
-                echo "Failed tests extracted:"
-                echo "$FAILED_DETAILS"
+              # Check if file has valid JSON
+              if jq empty test-output.json 2>/dev/null; then
+                echo "Valid JSON found in test-output.json"
+                
+                # Try to extract test results
+                TOTAL_TESTS=$(jq -r '.suites[].specs | length' test-output.json 2>/dev/null | awk '{sum+=$1} END {print sum}' || echo "0")
+                
+                if [ "$TOTAL_TESTS" -gt 0 ]; then
+                  echo "Found $TOTAL_TESTS tests in test-output.json"
+                  
+                  # Extract failed tests
+                  FAILED_DETAILS=$(jq -r '
+                    .suites[]? | 
+                    .specs[]? as $spec | 
+                    .file as $file |
+                    $spec.tests[]? | 
+                    select(.status == "failed" or .status == "timedOut") | 
+                    "- :x: [\(.projectName // "unknown")] " + ($spec.title // $file // "Unknown Test")
+                  ' test-output.json 2>/dev/null | sort -u)
+                  
+                  FAILED_TESTS=$(echo "$FAILED_DETAILS" | grep -c "^- :x:" || echo "0")
+                  
+                  # Extract passed tests
+                  PASSED_DETAILS=$(jq -r '
+                    .suites[]? | 
+                    .specs[]? as $spec | 
+                    .file as $file |
+                    $spec.tests[]? | 
+                    select(.status == "passed" or .status == "expected") | 
+                    "- :white_check_mark: [\(.projectName // "unknown")] " + ($spec.title // $file // "Unknown Test")
+                  ' test-output.json 2>/dev/null | sort -u)
+                  
+                  PASSED_TESTS=$(echo "$PASSED_DETAILS" | grep -c "^- :white_check_mark:" || echo "0")
+                  
+                  # Combine details (failed first)
+                  if [ -n "$FAILED_DETAILS" ] && [ -n "$PASSED_DETAILS" ]; then
+                    TEST_DETAILS=$(printf "%s\n%s" "$FAILED_DETAILS" "$PASSED_DETAILS")
+                  elif [ -n "$FAILED_DETAILS" ]; then
+                    TEST_DETAILS="$FAILED_DETAILS"
+                  elif [ -n "$PASSED_DETAILS" ]; then
+                    TEST_DETAILS="$PASSED_DETAILS"
+                  fi
+                  
+                  return 0
+                fi
+              else
+                echo "test-output.json is not valid JSON"
               fi
             fi
-            
-            # Extract PASSED tests (with browser info)
-            if [ "$PASSED_COUNT" -gt 0 ]; then
-              echo "✅ Extracting passed tests..."
+            return 1
+          }
+          
+          # Function to try parsing from test-results directory
+          parse_from_test_results() {
+            if [ -d "test-results" ]; then
+              echo "Checking test-results directory..."
               
-              # Get passed test details with project (browser) name and format directly
-              PASSED_DETAILS=$(jq -r '
-                .suites[].specs[] as $spec |
-                $spec.tests[] |
-                select(.status=="passed" or .status=="expected") |
-                "- :white_check_mark: [\(.projectName // "unknown")] › \($spec.title // "Unknown Test")"
-              ' test-results/results.json 2>/dev/null || echo "")
-              
-              if [ -n "$PASSED_DETAILS" ]; then
-                TEST_DETAILS="${TEST_DETAILS}${PASSED_DETAILS}"
-                echo "Passed tests extracted:"
-                echo "$PASSED_DETAILS"
+              # Look for results.json
+              if [ -f "test-results/results.json" ]; then
+                echo "Found test-results/results.json"
+                
+                if jq empty test-results/results.json 2>/dev/null; then
+                  TOTAL_TESTS=$(jq -r '.suites[].specs | length' test-results/results.json 2>/dev/null | awk '{sum+=$1} END {print sum}' || echo "0")
+                  
+                  if [ "$TOTAL_TESTS" -gt 0 ]; then
+                    # Same parsing logic as above
+                    FAILED_DETAILS=$(jq -r '
+                      .suites[]? | 
+                      .specs[]? as $spec | 
+                      .file as $file |
+                      $spec.tests[]? | 
+                      select(.status == "failed" or .status == "timedOut") | 
+                      "- :x: [\(.projectName // "unknown")] " + ($spec.title // $file // "Unknown Test")
+                    ' test-results/results.json 2>/dev/null | sort -u)
+                    
+                    FAILED_TESTS=$(echo "$FAILED_DETAILS" | grep -c "^- :x:" || echo "0")
+                    
+                    PASSED_DETAILS=$(jq -r '
+                      .suites[]? | 
+                      .specs[]? as $spec | 
+                      .file as $file |
+                      $spec.tests[]? | 
+                      select(.status == "passed" or .status == "expected") | 
+                      "- :white_check_mark: [\(.projectName // "unknown")] " + ($spec.title // $file // "Unknown Test")
+                    ' test-results/results.json 2>/dev/null | sort -u)
+                    
+                    PASSED_TESTS=$(echo "$PASSED_DETAILS" | grep -c "^- :white_check_mark:" || echo "0")
+                    
+                    if [ -n "$FAILED_DETAILS" ] && [ -n "$PASSED_DETAILS" ]; then
+                      TEST_DETAILS=$(printf "%s\n%s" "$FAILED_DETAILS" "$PASSED_DETAILS")
+                    elif [ -n "$FAILED_DETAILS" ]; then
+                      TEST_DETAILS="$FAILED_DETAILS"
+                    elif [ -n "$PASSED_DETAILS" ]; then
+                      TEST_DETAILS="$PASSED_DETAILS"
+                    fi
+                    
+                    return 0
+                  fi
+                fi
               fi
             fi
+            return 1
+          }
+          
+          # Function to parse from console output as fallback
+          parse_from_console() {
+            echo "Attempting to parse from console output..."
             
+            # Try to get test summary from the test output
+            if [ -f "test-output.json" ]; then
+              # Sometimes Playwright outputs text before/after JSON
+              SUMMARY=$(cat test-output.json | grep -E "([0-9]+) passed.*([0-9]+) failed|([0-9]+) failed.*([0-9]+) passed" | head -1)
+              
+              if [ -n "$SUMMARY" ]; then
+                echo "Found summary: $SUMMARY"
+                
+                PASSED_TESTS=$(echo "$SUMMARY" | grep -oP '(\d+) passed' | grep -oP '\d+' || echo "0")
+                FAILED_TESTS=$(echo "$SUMMARY" | grep -oP '(\d+) failed' | grep -oP '\d+' || echo "0")
+                TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
+                
+                if [ "$TOTAL_TESTS" -gt 0 ]; then
+                  TEST_DETAILS="Summary extracted from console output:\n- Tests were run but detailed results parsing failed\n- Check the GitHub Actions logs for full details"
+                  return 0
+                fi
+              fi
+            fi
+            return 1
+          }
+          
+          # Try parsing methods in order
+          if ! parse_from_output_json; then
+            echo "Failed to parse from test-output.json, trying test-results..."
+            if ! parse_from_test_results; then
+              echo "Failed to parse from test-results, trying console output..."
+              if ! parse_from_console; then
+                echo "All parsing methods failed"
+                PARSE_ERROR="Unable to parse test results from any source"
+                TEST_DETAILS="- :x: Failed to parse test results - check JSON reporter configuration"
+              fi
+            fi
+          fi
+          
+          # Get git information
+          REPO_NAME="${GITHUB_REPOSITORY}"
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          COMMIT_SHA="${GITHUB_SHA:0:8}"
+          
+          # Determine overall status
+          if [ "$FAILED_TESTS" -gt 0 ]; then
+            STATUS_EMOJI=":x:"
+            STATUS_TEXT="Failed"
+            STATUS_COLOR="#FF0000"
           else
-            echo "⚠️ test-results/results.json not found"
-            echo "🔍 Checking for alternative test results..."
-            
-            # Fallback: use default values
-            PASSED_COUNT=6
-            FAILED_COUNT=2
-            TOTAL_COUNT=8
-            TEST_DETAILS="- :x: Failed to parse test results - check JSON reporter\n"
+            STATUS_EMOJI=":white_check_mark:"
+            STATUS_TEXT="Passed"
+            STATUS_COLOR="#36a64f"
           fi
           
-          # Ensure we have some test details
-          if [ -z "$TEST_DETAILS" ] || [ "$TEST_DETAILS" = "" ]; then
-            echo "⚠️ No test details extracted, using summary"
-            if [ "$FAILED_COUNT" -gt 0 ]; then
-              TEST_DETAILS="- :x: $FAILED_COUNT test(s) failed\n- :white_check_mark: $PASSED_COUNT test(s) passed\n"
-            else
-              TEST_DETAILS="- :white_check_mark: All $PASSED_COUNT test(s) passed\n"
-            fi
-          fi
+          # Escape special characters for JSON
+          TEST_DETAILS_ESCAPED=$(echo "$TEST_DETAILS" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
           
-          # Set environment variables
-          echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_ENV
-          echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_ENV
-          echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_ENV
-          
-          # Save TEST_DETAILS to a file to preserve newlines
-          echo -e "$TEST_DETAILS" > /tmp/test_details.txt
-          
-          echo "✅ Parsed Results:"
-          echo "   Total: $TOTAL_COUNT"
-          echo "   Passed: $PASSED_COUNT"
-          echo "   Failed: $FAILED_COUNT"
-          echo "   Test details:"
-          cat /tmp/test_details.txt
-
-      - name: Send Slack notification with actual test results
-        if: always()
-        run: |
-          echo "🚀 Sending Slack notification with actual test results..."
-          echo "Job status: ${{ job.status }}"
-          
-          echo "🔍 Using environment variables:"
-          echo "   Short SHA: $SHORT_SHA"
-          echo "   Total: $TOTAL_COUNT"
-          echo "   Passed: $PASSED_COUNT"
-          echo "   Failed: $FAILED_COUNT"
-          
-          # Read test details from file
-          TEST_DETAILS_CONTENT=$(cat /tmp/test_details.txt | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}' | sed '$ s/\\n$//')
-          
-          echo "📝 Test details content:"
-          echo "$TEST_DETAILS_CONTENT"
-          
-          # Create the Slack message payload
-          cat > slack_payload.json << 'EOF'
+          # Create Slack message
+          SLACK_MESSAGE=$(cat << EOF
           {
-            "text": "🧪 نتائج الاختبارات الآلية - SUCCESS_STATUS",
-            "blocks": [
+            "text": "${STATUS_EMOJI} Playwright Tests ${STATUS_TEXT}",
+            "attachments": [
               {
-                "type": "header",
-                "text": {
-                  "type": "plain_text",
-                  "text": "🧪 نتائج الاختبارات الآلية - SUCCESS_STATUS"
-                }
-              },
-              {
-                "type": "section",
+                "color": "${STATUS_COLOR}",
                 "fields": [
                   {
-                    "type": "mrkdwn",
-                    "text": "*repo:* REPO_NAME"
+                    "title": "Repository",
+                    "value": "${REPO_NAME}",
+                    "short": true
                   },
                   {
-                    "type": "mrkdwn", 
-                    "text": "*branch:* BRANCH_NAME"
+                    "title": "Branch",
+                    "value": "${BRANCH_NAME}",
+                    "short": true
                   },
                   {
-                    "type": "mrkdwn",
-                    "text": "*ال commit:* COMMIT_SHA"
+                    "title": "Commit",
+                    "value": "${COMMIT_SHA}",
+                    "short": true
                   },
                   {
-                    "type": "mrkdwn",
-                    "text": "*Total TC:* TOTAL_TC"
+                    "title": "Total Tests",
+                    "value": "${TOTAL_TESTS}",
+                    "short": true
                   },
                   {
-                    "type": "mrkdwn",
-                    "text": "*Passed:* PASSED_TC"
+                    "title": "Passed",
+                    "value": "${PASSED_TESTS}",
+                    "short": true
                   },
                   {
-                    "type": "mrkdwn",
-                    "text": "*failed:* FAILED_TC"
-                  }
-                ]
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "*TC detailed*\nTEST_DETAILS_PLACEHOLDER"
-                }
-              },
-              {
-                "type": "actions",
-                "elements": [
-                  {
-                    "type": "button",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "📊show report"
-                    },
-                    "url": "RUN_URL"
+                    "title": "Failed",
+                    "value": "${FAILED_TESTS}",
+                    "short": true
                   },
                   {
-                    "type": "button",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "🔍 HTML Report"
-                    },
-                    "url": "ARTIFACTS_URL"
+                    "title": "Test Details",
+                    "value": "${TEST_DETAILS_ESCAPED}",
+                    "short": false
                   }
                 ]
               }
             ]
           }
           EOF
+          )
           
-          # Determine success status emoji
-          if [ "$FAILED_COUNT" -eq 0 ]; then
-            SUCCESS_STATUS="✅ Success"
-          else
-            SUCCESS_STATUS="❌ Failed"
-          fi
+          # Send to Slack
+          echo "Sending notification to Slack..."
+          curl -X POST -H 'Content-type: application/json' \
+            --data "$SLACK_MESSAGE" \
+            "$SLACK_WEBHOOK_URL"
           
-          # Replace placeholders in JSON
-          sed -i "s|SUCCESS_STATUS|$SUCCESS_STATUS|g" slack_payload.json
-          sed -i "s|REPO_NAME|${{ github.repository }}|g" slack_payload.json
-          sed -i "s|BRANCH_NAME|${{ github.ref_name }}|g" slack_payload.json
-          sed -i "s|COMMIT_SHA|$SHORT_SHA|g" slack_payload.json
-          sed -i "s|TOTAL_TC|$TOTAL_COUNT|g" slack_payload.json
-          sed -i "s|PASSED_TC|$PASSED_COUNT|g" slack_payload.json
-          sed -i "s|FAILED_TC|$FAILED_COUNT|g" slack_payload.json
-          sed -i "s|RUN_URL|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|g" slack_payload.json
-          sed -i "s|ARTIFACTS_URL|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts|g" slack_payload.json
-          sed -i "s|TEST_DETAILS_PLACEHOLDER|$TEST_DETAILS_CONTENT|g" slack_payload.json
-          
-          echo "📄 Final Slack payload:"
-          cat slack_payload.json
-          
-          # Send notification with curl
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            echo "📤 Sending notification via curl..."
-            HTTP_CODE=$(curl -s -w "%{http_code}" -X POST \
-              -H "Content-Type: application/json" \
-              -d @slack_payload.json \
-              "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "000")
-            
-            echo "📊 HTTP Response Code: $HTTP_CODE"
-            
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Slack notification sent successfully!"
-            else
-              echo "❌ Slack notification failed with HTTP code: $HTTP_CODE"
-            fi
-          else
-            echo "⚠️ No Slack webhook URL configured"
-          fi
-          
-          echo "🏁 Slack notification step completed"
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          echo ""
+          echo "=== Notification sent ==="
+          echo "Total: $TOTAL_TESTS | Passed: $PASSED_TESTS | Failed: $FAILED_TESTS"
 
-      - name: Upload test results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: |
-            test-results/
-            playwright-report/
+          path: playwright-report/
           retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 30
+
 
 # name: Playwright Tests with Slack Notification - FIXED
 
