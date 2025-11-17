@@ -45,7 +45,7 @@ async function runTests() {
         testType: 'Mobile',
         timestamp: new Date().toISOString()
       };
-
+ 
       console.log('\n📊 ملخص النتائج:');
       console.log('==================');
       console.log(`إجمالي الاختبارات: ${results.total}`);
