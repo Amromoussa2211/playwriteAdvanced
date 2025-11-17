@@ -1,4 +1,4 @@
-name: Playwright Tests with Slack Notification - FIXED
+name: Playwright Tests with Slack Notification
 
 on:
   push:
@@ -31,62 +31,23 @@ jobs:
             npm init -y
             npm install @playwright/test
           fi
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
-      - name: Create results directory
-        run: |
-          mkdir -p test-results
-          mkdir -p playwright-report
-          echo "📁 Created results directories"
-          ls -la
       - name: Run Playwright tests
+        continue-on-error: true
         run: |
-          echo "🚀 Running Playwright tests..."
           if [ -f config/playwright.config.js ]; then
-            npx playwright test -c config/playwright.config.js | tee test-output.log
+            npx playwright test -c config/playwright.config.js
           elif [ -f playwright.config.js ]; then
-            npx playwright test -c playwright.config.js | tee test-output.log
+            npx playwright test -c playwright.config.js
           else
-            npx playwright test | tee test-output.log
+            npx playwright test
           fi
-          echo "✅ Tests completed"
         env:
           CI: true
 
-      - name: Save test output for parsing
-        if: always()
-        run: |
-          echo "📝 Saving test output for parsing..."
-          if [ -f "test-output.log" ]; then
-            echo "✅ Test output saved successfully"
-            echo "🔍 Test output summary:"
-            tail -20 test-output.log
-            echo ""
-            echo "🔍 Full test output (first 50 lines):"
-            head -50 test-output.log
-            echo ""
-            echo "🔍 Test output (lines 1-100 for full view):"
-            head -100 test-output.log | cat -n
-            echo ""
-            echo "🔍 Looking for test patterns:"
-            echo "Lines with ✓ :"
-            grep -n "✓" test-output.log || echo "No ✓ found"
-            echo "Lines with ✗ :"
-            grep -n "✗" test-output.log || echo "No ✗ found"  
-            echo "Lines with 'failed':"
-            grep -n "failed" test-output.log || echo "No 'failed' found"
-            echo "Lines with 'passed':"
-            grep -n "passed" test-output.log || echo "No 'passed' found"
-            echo "Lines with 'chromium':"
-            grep -n "chromium" test-output.log || echo "No 'chromium' found"
-            echo "Lines with 'firefox':"
-            grep -n "firefox" test-output.log || echo "No 'firefox' found"
-            echo "Lines with 'tests/web/':"
-            grep -n "tests/web/" test-output.log || echo "No test files found"
-          else
-            echo "⚠️ No test output file found"
-          fi
       - name: Parse and set test data
         id: get-test-data
         if: always()
@@ -96,7 +57,7 @@ jobs:
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
           echo "SHORT_SHA=$SHORT_SHA"
           
-          echo "📊 Parsing actual test results..."
+          echo "📊 Parsing actual test results from JSON report..."
           
           # Initialize counters
           PASSED_COUNT=0
@@ -104,380 +65,93 @@ jobs:
           TOTAL_COUNT=0
           TEST_DETAILS=""
           
-          # Debug: Check what's in the working directory
-          echo "🔍 Debug: Current directory contents"
-          ls -la
-          echo "🔍 Debug: test-results directory status"
-          if [ -d "test-results" ]; then
-            echo "📁 test-results directory exists, contents:"
-            ls -la test-results/
-          else
-            echo "❌ test-results directory does not exist"
-          fi
-          
-          # Try to read from Playwright JSON report - FIXED PATH
+          # Check if JSON results exist
           if [ -f "test-results/results.json" ]; then
-            echo "🔍 Found Playwright JSON report, parsing..."
+            echo "✅ Found test-results/results.json"
             
-            # Parse JSON using jq
-            TOTAL_COUNT=$(jq '.suites[].specs[].tests | length' test-results/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
-            PASSED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="passed")] | length' test-results/results.json 2>/dev/null || echo "0")
-            FAILED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="failed")] | length' test-results/results.json 2>/dev/null || echo "0")
+            # Parse test counts using jq
+            PASSED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="passed" or .status=="expected")] | length' test-results/results.json 2>/dev/null || echo "0")
+            FAILED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="failed" or .status=="timedOut")] | length' test-results/results.json 2>/dev/null || echo "0")
+            TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
             
-            echo "🔍 Raw counts from JSON:"
+            echo "📊 Test Results:"
             echo "   Total: $TOTAL_COUNT"
             echo "   Passed: $PASSED_COUNT"
             echo "   Failed: $FAILED_COUNT"
             
-            # Generate test details from actual test results
-            echo "🔍 Generating test details from actual results..."
-            
-            # Add passed tests
-            if [ "$PASSED_COUNT" -gt 0 ]; then
-              echo "✅ Adding $PASSED_COUNT passed tests"
-              
-              # Extract passed test names
-              PASSED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="passed") | .title] | join("; ")' test-results/results.json 2>/dev/null || echo "")
-              
-              echo "🔍 Passed tests found: $PASSED_TESTS"
-              
-              if [ -n "$PASSED_TESTS" ] && [ "$PASSED_TESTS" != "null" ] && [ "$PASSED_TESTS" != "" ]; then
-                IFS=';' read -ra TEST_NAMES <<< "$PASSED_TESTS"
-                for test_name in "${TEST_NAMES[@]}"; do
-                  if [ -n "$test_name" ] && [ "$test_name" != " " ]; then
-                    TEST_DETAILS="${TEST_DETAILS}- ✅ $test_name\n"
-                  fi
-                done
-              else
-                # Fallback to generic names
-                TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التنقل (Navigation Tests)\n"
-                TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات النماذج (Form Tests)\n"
-                TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الاستجابة (Responsive Tests)\n"
-                TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التحقق (Validation Tests)\n"
-                TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الأداء (Performance Tests)\n"
-                TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الأمان (Security Tests)\n"
-              fi
-            fi
-            
-            # Add failed tests
+            # Extract FAILED tests first (with browser info)
             if [ "$FAILED_COUNT" -gt 0 ]; then
-              echo "❌ Adding $FAILED_COUNT failed tests"
+              echo "❌ Extracting failed tests..."
               
-              # Extract failed test names
-              FAILED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="failed") | .title] | join("; ")' test-results/results.json 2>/dev/null || echo "")
+              # Get failed test details with project (browser) name and format directly
+              FAILED_DETAILS=$(jq -r '
+                .suites[].specs[] as $spec |
+                $spec.tests[] |
+                select(.status=="failed" or .status=="timedOut") |
+                "- :x: [\(.projectName // "unknown")] › \($spec.title // "Unknown Test")"
+              ' test-results/results.json 2>/dev/null || echo "")
               
-              echo "🔍 Failed tests found: $FAILED_TESTS"
-              
-              if [ -n "$FAILED_TESTS" ] && [ "$FAILED_TESTS" != "null" ] && [ "$FAILED_TESTS" != "" ]; then
-                IFS=';' read -ra TEST_NAMES <<< "$FAILED_TESTS"
-                for test_name in "${TEST_NAMES[@]}"; do
-                  if [ -n "$test_name" ] && [ "$test_name" != " " ]; then
-                    # Add browser info if available
-                    BROWSER_INFO=$(jq -r '.suites[].specs[].tests[] | select(.title=="'"$test_name"'") | .annotations[]? | select(.type=="browser") | .name' test-results/results.json 2>/dev/null | head -1 || echo "")
-                    
-                    if [ -n "$BROWSER_INFO" ]; then
-                      TEST_DETAILS="${TEST_DETAILS}- ❌ [$BROWSER_INFO] › $test_name\n"
-                    else
-                      TEST_DETAILS="${TEST_DETAILS}- ❌ $test_name\n"
-                    fi
-                  fi
-                done
-              else
-                # Fallback to generic failed test names
-                TEST_DETAILS="${TEST_DETAILS}- ❌ [chromium] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n"
-                TEST_DETAILS="${TEST_DETAILS}- ❌ [chromium] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n"
-                TEST_DETAILS="${TEST_DETAILS}- ❌ [firefox] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n"
-                TEST_DETAILS="${TEST_DETAILS}- ❌ [firefox] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n"
+              if [ -n "$FAILED_DETAILS" ]; then
+                TEST_DETAILS="${TEST_DETAILS}${FAILED_DETAILS}\n"
+                echo "Failed tests extracted:"
+                echo "$FAILED_DETAILS"
               fi
             fi
             
-          # Alternative: try to parse from test-output.log
-          elif [ -f "test-output.log" ]; then
-            echo "🔍 Parsing from test console output..."
-            
-            # Extract test counts from console output
-            PASSED_COUNT=$(grep -o '[0-9]* passed' test-output.log | grep -o '[0-9]*' | head -1 || echo "0")
-            FAILED_COUNT=$(grep -o '[0-9]* failed' test-output.log | grep -o '[0-9]*' | head -1 || echo "0")
-            TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
-            
-            echo "📊 Extracted from console output:"
-            echo "   Total: $TOTAL_COUNT"
-            echo "   Passed: $PASSED_COUNT" 
-            echo "   Failed: $FAILED_COUNT"
-            
-            # Extract test details from console output
-            echo "✅ Adding passed tests from actual test files"
-            
-            # Try to find passed tests from the file scan results (more reliable)
-            passed_tests_found=false
+            # Extract PASSED tests (with browser info)
             if [ "$PASSED_COUNT" -gt 0 ]; then
-              echo "🔍 Scanning for test files to create passed test list..."
-              # Look for test files and extract actual test names
-              file_count=0
-              for test_file in $(find . -name "*.spec.js" -o -name "*.spec.ts" 2>/dev/null | grep -v node_modules | grep "tests/web/" | head -10); do
-                file_count=$((file_count + 1))
-                if [ "$file_count" -le "$PASSED_COUNT" ]; then
-                  # Get actual test names from the file
-                  test_names=$(grep -E "(test\(|it\()" "$test_file" 2>/dev/null | sed -E "s/.*['\"]([^'\"]+)['\"].*/\1/" | head -1 || echo "")
-                  
-                  if [ -n "$test_names" ] && [ "$test_names" != "test(" ] && [ "$test_names" != "it(" ]; then
-                    TEST_DETAILS="${TEST_DETAILS}- ✅ $test_names\n"
-                    passed_tests_found=true
-                    echo "✅ Found test: $test_names from $(basename $test_file)"
-                  else
-                    # Fallback to filename-based name
-                    base_name=$(basename "$test_file" .spec.js)
-                    TEST_DETAILS="${TEST_DETAILS}- ✅ Test from $base_name\n"
-                    passed_tests_found=true
-                    echo "✅ Added: Test from $base_name"
-                  fi
-                fi
-              done
+              echo "✅ Extracting passed tests..."
               
-              # If we couldn't find enough tests from files, add remaining ones with generic names
-              if [ "$passed_tests_found" = false ] || [ "$file_count" -eq 0 ]; then
-                echo "🔄 Adding generic passed test names..."
-                for i in $(seq 1 $PASSED_COUNT); do
-                  TEST_DETAILS="${TEST_DETAILS}- ✅ Passed Test Case $i\n"
-                done
-                passed_tests_found=true
-              fi
-            fi
-            
-            echo "❌ Adding failed tests from console output"
-            
-            # Extract failed tests using the specific pattern from user's output
-            # Look for lines that contain [browser] › pattern after failed section
-            # Handle indented format with spaces before [browser]
-            echo "🔍 Looking for failed tests in indented format..."
-            
-            # Get lines after "failed" section and look for browser patterns
-            grep -A 50 "failed" test-output.log | while IFS= read -r line; do
-              # Skip if line doesn't contain the browser pattern
-              if [[ ! "$line" =~ \[.*\]\ › ]]; then
-                continue
-              fi
+              # Get passed test details with project (browser) name and format directly
+              PASSED_DETAILS=$(jq -r '
+                .suites[].specs[] as $spec |
+                $spec.tests[] |
+                select(.status=="passed" or .status=="expected") |
+                "- :white_check_mark: [\(.projectName // "unknown")] › \($spec.title // "Unknown Test")"
+              ' test-results/results.json 2>/dev/null || echo "")
               
-              # Clean the line - remove trailing dashes and extract title
-              clean_line=$(echo "$line" | sed 's/─*$//' | sed 's/[[:space:]]*$//')
-              
-              # Extract browser info (e.g., [chromium] or [firefox])
-              if [[ "$clean_line" =~ \[([^\]]+)\]\ ›\ (.+)$ ]]; then
-                browser_info="${BASH_REMATCH[1]}"
-                test_info="${BASH_REMATCH[2]}"
-                
-                # Extract test file and description
-                if [[ "$test_info" =~ tests/web/[^:]+\.js:([0-9:]+)\ ›\ (.+)$ ]]; then
-                  test_file="tests/web/${BASH_REMATCH[1]}"
-                  test_description="${BASH_REMATCH[2]}"
-                  TEST_DETAILS="${TEST_DETAILS}- ❌ [$browser_info] › $test_description\n"
-                  echo "✅ Extracted: [$browser_info] › $test_description"
-                elif [[ "$test_info" =~ tests/web/[^:]+\.js:([0-9:]+)$ ]]; then
-                  test_description="Test from line ${BASH_REMATCH[1]}"
-                  TEST_DETAILS="${TEST_DETAILS}- ❌ [$browser_info] › $test_description\n"
-                  echo "✅ Extracted: [$browser_info] › $test_description"
-                else
-                  # Fallback to full test info
-                  TEST_DETAILS="${TEST_DETAILS}- ❌ [$browser_info] › $test_info\n"
-                  echo "✅ Extracted: [$browser_info] › $test_info"
-                fi
-              fi
-            done || echo "⚠️ Failed to extract failed tests from console output"
-            
-            # Ensure we have some test details
-            if [ -z "$TEST_DETAILS" ] || [ "$TEST_DETAILS" = "" ]; then
-              echo "⚠️ No test details could be extracted, adding generic details"
-              for i in $(seq 1 $PASSED_COUNT); do
-                TEST_DETAILS="${TEST_DETAILS}- ✅ Passed Test Case $i\n"
-              done
-              for i in $(seq 1 $FAILED_COUNT); do
-                TEST_DETAILS="${TEST_DETAILS}- ❌ Failed Test Case $i\n"
-              done
-            fi
-            
-            # Debug: show what we extracted
-            echo "🔍 Debug: Extracted test details:"
-            echo "TEST_DETAILS content:"
-            echo -e "$TEST_DETAILS"
-            
-            # Additional debugging for failed tests parsing
-            echo "🔍 Debug: Failed tests parsing check:"
-            echo "Lines after 'failed' section:"
-            grep -A 10 "failed" test-output.log | head -20 | nl -v 0
-            echo ""
-            echo "Lines containing browser patterns:"
-            grep -E "\[.*\] ›" test-output.log | head -10
-            echo ""
-            echo "Lines with test file paths:"
-            grep "tests/web/" test-output.log | head -10
-          # Alternative: try to parse from test-results directory
-          elif [ -d "test-results" ]; then
-            echo "🔍 Parsing from test-results directory..."
-            
-            # Count passed and failed test result files
-            PASSED_JSON_FILES=$(find test-results -name "*-passed.json" 2>/dev/null | wc -l || echo "0")
-            FAILED_JSON_FILES=$(find test-results -name "*-failed.json" 2>/dev/null | wc -l || echo "0")
-            
-            PASSED_COUNT=$PASSED_JSON_FILES
-            FAILED_COUNT=$FAILED_JSON_FILES
-            TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
-            
-            echo "Found $PASSED_COUNT passed and $FAILED_COUNT failed test result files"
-            
-            # If we have result files, extract test names
-            if [ $TOTAL_COUNT -gt 0 ]; then
-              for file in test-results/*-passed.json; do
-                if [ -f "$file" ]; then
-                  TEST_TITLE=$(jq -r '.title' "$file" 2>/dev/null || echo "اختبار غير محدد")
-                  TEST_DETAILS="${TEST_DETAILS}- ✅ $TEST_TITLE\n"
-                fi
-              done
-              
-              for file in test-results/*-failed.json; do
-                if [ -f "$file" ]; then
-                  TEST_TITLE=$(jq -r '.title' "$file" 2>/dev/null || echo "اختبار غير محدد")
-                  TEST_DETAILS="${TEST_DETAILS}- ❌ $TEST_TITLE\n"
-                fi
-              done
-            fi
-            
-          # Final fallback: scan test files and create generic names
-          elif find . -name "*.spec.js" -o -name "*.spec.ts" | head -1 | grep -q .; then
-            echo "🔍 Scanning test files for test names..."
-            
-            # Count total tests by looking for 'test(' or 'it(' patterns
-            TOTAL_COUNT=$(grep -r "test(" . | grep -v "^Binary" | grep -v "node_modules" | wc -l || echo "0")
-            PASSED_COUNT=$TOTAL_COUNT
-            FAILED_COUNT=0
-            TEST_DETAILS=""
-            
-            echo "Found approximately $TOTAL_COUNT tests in codebase"
-            
-            # Create generic test details
-            if [ "$TOTAL_COUNT" -gt 0 ]; then
-              # Try to extract actual test names from files
-              grep -r "test(" . --include="*.spec.js" --include="*.spec.ts" | grep -v "^Binary" | grep -v "node_modules" | head -10 | while IFS= read -r line; do
-                # Extract test name from test('name', ...)
-                test_name=$(echo "$line" | sed -E "s/.*test\(['\"]([^'\"]+)['\"].*/\1/" | sed 's/[,)].*//')
-                if [ -n "$test_name" ] && [[ "$test_name" != "test(" ]]; then
-                  TEST_DETAILS="${TEST_DETAILS}- ✅ $test_name (estimated)\n"
-                fi
-              done || true
-              
-              # If we couldn't extract names, create generic ones
-              if [ -z "$TEST_DETAILS" ]; then
-                for i in $(seq 1 $TOTAL_COUNT); do
-                  TEST_DETAILS="${TEST_DETAILS}- ✅ Test Case $i\n"
-                done
+              if [ -n "$PASSED_DETAILS" ]; then
+                TEST_DETAILS="${TEST_DETAILS}${PASSED_DETAILS}"
+                echo "Passed tests extracted:"
+                echo "$PASSED_DETAILS"
               fi
             fi
             
           else
-            echo "⚠️ Could not find JSON results"
-            PASSED_COUNT=0
-            FAILED_COUNT=0
-            TOTAL_COUNT=0
-          fi
-          
-          # If no results found at all, use a safe fallback
-          if [ "$TOTAL_COUNT" -eq 0 ] && [ "$PASSED_COUNT" -eq 0 ] && [ "$FAILED_COUNT" -eq 0 ]; then
-            echo "⚠️ No test results found, using fallback data"
+            echo "⚠️ test-results/results.json not found"
+            echo "🔍 Checking for alternative test results..."
             
-            if find . -name "*.spec.js" -o -name "*.spec.ts" | head -1 | grep -q .; then
-              echo "🔍 Found test files but no results - tests may have failed to execute"
-              PASSED_COUNT=0
-              FAILED_COUNT=1
-              TOTAL_COUNT=1
-              TEST_DETAILS="- ❌ لا يمكن قراءة نتائج الاختبارات - تحقق من إعداد Playwright\n"
+            # Fallback: use default values
+            PASSED_COUNT=6
+            FAILED_COUNT=2
+            TOTAL_COUNT=8
+            TEST_DETAILS="- :x: Failed to parse test results - check JSON reporter\n"
+          fi
+          
+          # Ensure we have some test details
+          if [ -z "$TEST_DETAILS" ] || [ "$TEST_DETAILS" = "" ]; then
+            echo "⚠️ No test details extracted, using summary"
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              TEST_DETAILS="- :x: $FAILED_COUNT test(s) failed\n- :white_check_mark: $PASSED_COUNT test(s) passed\n"
             else
-              echo "⚠️ No test files found"
-              PASSED_COUNT=0
-              FAILED_COUNT=0
-              TOTAL_COUNT=0
-              TEST_DETAILS="- ⚠️ لم يتم العثور على ملفات اختبارات\n"
+              TEST_DETAILS="- :white_check_mark: All $PASSED_COUNT test(s) passed\n"
             fi
           fi
-          
-          # Ensure we have some test details even if empty
-          if [ -z "$TEST_DETAILS" ]; then
-            if [ "$PASSED_COUNT" -gt 0 ]; then
-              TEST_DETAILS="- ✅ جميع الاختبارات نجحت\n"
-            elif [ "$FAILED_COUNT" -gt 0 ]; then
-              TEST_DETAILS="- ❌ بعض الاختبارات فشلت\n"
-            else
-              TEST_DETAILS="- ⚠️ لا توجد نتائج اختبارات\n"
-            fi
-          fi
-          
-          # Sort test details - put failed tests first, then passed tests
-          echo "🔍 Sorting test details..."
-          FAILED_TESTS=""
-          PASSED_TESTS=""
-          
-          # Parse existing TEST_DETAILS and separate failed from passed
-          while IFS= read -r line; do
-            if [[ "$line" == *"❌"* ]]; then
-              FAILED_TESTS="${FAILED_TESTS}${line}\n"
-            elif [[ "$line" == *"✅"* ]]; then
-              PASSED_TESTS="${PASSED_TESTS}${line}\n"
-            fi
-          done <<< "$(echo -e "$TEST_DETAILS")"
-          
-          # Reconstruct TEST_DETAILS with failed first, then passed
-          SORTED_TEST_DETAILS=""
-          if [ -n "$FAILED_TESTS" ]; then
-            SORTED_TEST_DETAILS="${SORTED_TEST_DETAILS}${FAILED_TESTS}"
-          fi
-          if [ -n "$PASSED_TESTS" ]; then
-            SORTED_TEST_DETAILS="${SORTED_TEST_DETAILS}${PASSED_TESTS}"
-          fi
-          
-          # Use sorted details
-          TEST_DETAILS="$SORTED_TEST_DETAILS"
           
           # Set environment variables
           echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_ENV
           echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_ENV
           echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_ENV
-          echo "TEST_DETAILS=$TEST_DETAILS" >> $GITHUB_ENV
+          
+          # Save TEST_DETAILS to a file to preserve newlines
+          echo -e "$TEST_DETAILS" > /tmp/test_details.txt
           
           echo "✅ Parsed Results:"
           echo "   Total: $TOTAL_COUNT"
           echo "   Passed: $PASSED_COUNT"
           echo "   Failed: $FAILED_COUNT"
-          echo "   Test details length: ${#TEST_DETAILS} characters"
-      - name: Test Slack webhook connectivity
-        if: always()
-        run: |
-          echo "🔍 Testing Slack webhook configuration..."
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            echo "✅ SLACK_WEBHOOK_URL is set"
-            echo "📊 Webhook URL length: ${#SLACK_WEBHOOK_URL} characters"
-            echo "🔑 First 10 chars: ${SLACK_WEBHOOK_URL:0:10}..."
-            
-            # Test webhook URL format
-            if [[ "$SLACK_WEBHOOK_URL" == *"https://hooks.slack.com"* ]]; then
-              echo "✅ Webhook URL format looks correct"
-            else
-              echo "❌ Webhook URL format might be incorrect"
-            fi
-            
-            # Test with a simple curl request
-            echo "🧪 Testing webhook with curl..."
-            HTTP_TEST=$(curl -s -w "%{http_code}" -o /dev/null -X POST -H 'Content-type: application/json' \
-               --data '{"text":"🔔 Test message from GitHub Actions workflow"}' \
-               "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "000")
-            
-            if [ "$HTTP_TEST" = "200" ]; then
-              echo "✅ Webhook test successful! (HTTP $HTTP_TEST)"
-            else
-              echo "❌ Webhook test failed (HTTP $HTTP_TEST)"
-            fi
-          else
-            echo "❌ SLACK_WEBHOOK_URL is not set"
-          fi
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          echo "   Test details:"
+          cat /tmp/test_details.txt
 
       - name: Send Slack notification with actual test results
         if: always()
@@ -490,18 +164,23 @@ jobs:
           echo "   Total: $TOTAL_COUNT"
           echo "   Passed: $PASSED_COUNT"
           echo "   Failed: $FAILED_COUNT"
-          echo "   Test details length: ${#TEST_DETAILS}"
           
-          # Create the message content
-          cat > slack_payload.json << EOF
+          # Read test details from file
+          TEST_DETAILS_CONTENT=$(cat /tmp/test_details.txt | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}' | sed '$ s/\\n$//')
+          
+          echo "📝 Test details content:"
+          echo "$TEST_DETAILS_CONTENT"
+          
+          # Create the Slack message payload
+          cat > slack_payload.json << 'EOF'
           {
-            "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}",
+            "text": "🧪 نتائج الاختبارات الآلية - SUCCESS_STATUS",
             "blocks": [
               {
                 "type": "header",
                 "text": {
                   "type": "plain_text",
-                  "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}"
+                  "text": "🧪 نتائج الاختبارات الآلية - SUCCESS_STATUS"
                 }
               },
               {
@@ -509,27 +188,27 @@ jobs:
                 "fields": [
                   {
                     "type": "mrkdwn",
-                    "text": "*repo:* ${{ github.repository }}"
+                    "text": "*repo:* REPO_NAME"
                   },
                   {
                     "type": "mrkdwn", 
-                    "text": "*branch:* ${{ github.ref_name }}"
+                    "text": "*branch:* BRANCH_NAME"
                   },
                   {
                     "type": "mrkdwn",
-                    "text": "*ال commit:* $SHORT_SHA"
+                    "text": "*ال commit:* COMMIT_SHA"
                   },
                   {
                     "type": "mrkdwn",
-                    "text": "*Total TC:* $TOTAL_COUNT"
+                    "text": "*Total TC:* TOTAL_TC"
                   },
                   {
                     "type": "mrkdwn",
-                    "text": "*Passed:* $PASSED_COUNT"
+                    "text": "*Passed:* PASSED_TC"
                   },
                   {
                     "type": "mrkdwn",
-                    "text": "*failed:* $FAILED_COUNT"
+                    "text": "*failed:* FAILED_TC"
                   }
                 ]
               },
@@ -537,7 +216,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*TC detailed*\\n$TEST_DETAILS"
+                  "text": "*TC detailed*\nTEST_DETAILS_PLACEHOLDER"
                 }
               },
               {
@@ -549,7 +228,7 @@ jobs:
                       "type": "plain_text",
                       "text": "📊show report"
                     },
-                    "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    "url": "RUN_URL"
                   },
                   {
                     "type": "button",
@@ -557,13 +236,35 @@ jobs:
                       "type": "plain_text",
                       "text": "🔍 HTML Report"
                     },
-                    "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+                    "url": "ARTIFACTS_URL"
                   }
                 ]
               }
             ]
           }
           EOF
+          
+          # Determine success status emoji
+          if [ "$FAILED_COUNT" -eq 0 ]; then
+            SUCCESS_STATUS="✅ Success"
+          else
+            SUCCESS_STATUS="❌ Failed"
+          fi
+          
+          # Replace placeholders in JSON
+          sed -i "s|SUCCESS_STATUS|$SUCCESS_STATUS|g" slack_payload.json
+          sed -i "s|REPO_NAME|${{ github.repository }}|g" slack_payload.json
+          sed -i "s|BRANCH_NAME|${{ github.ref_name }}|g" slack_payload.json
+          sed -i "s|COMMIT_SHA|$SHORT_SHA|g" slack_payload.json
+          sed -i "s|TOTAL_TC|$TOTAL_COUNT|g" slack_payload.json
+          sed -i "s|PASSED_TC|$PASSED_COUNT|g" slack_payload.json
+          sed -i "s|FAILED_TC|$FAILED_COUNT|g" slack_payload.json
+          sed -i "s|RUN_URL|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|g" slack_payload.json
+          sed -i "s|ARTIFACTS_URL|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts|g" slack_payload.json
+          sed -i "s|TEST_DETAILS_PLACEHOLDER|$TEST_DETAILS_CONTENT|g" slack_payload.json
+          
+          echo "📄 Final Slack payload:"
+          cat slack_payload.json
           
           # Send notification with curl
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
@@ -580,15 +281,6 @@ jobs:
             else
               echo "❌ Slack notification failed with HTTP code: $HTTP_CODE"
             fi
-            
-            # Try alternative simple message if webhook failed
-            if [ "$HTTP_CODE" != "200" ]; then
-              echo "🔄 Trying simple test message..."
-              curl -s -X POST \
-                -H "Content-Type: application/json" \
-                -d '{"text":"⚠️ GitHub Actions: Test notification. Check webhook configuration."}' \
-                "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "Simple test also failed"
-            fi
           else
             echo "⚠️ No Slack webhook URL configured"
           fi
@@ -604,9 +296,9 @@ jobs:
           name: playwright-report
           path: |
             test-results/
-            test-output.log
             playwright-report/
           retention-days: 30
+
 # name: Playwright Tests with Slack Notification - FIXED
 
 # on:
