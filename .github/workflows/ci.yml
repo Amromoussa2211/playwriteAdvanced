@@ -35,17 +35,38 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
+      - name: Create results directory
+        run: |
+          mkdir -p test-results
+          mkdir -p playwright-report
+          echo "📁 Created results directories"
+          ls -la
+
       - name: Run Playwright tests
         run: |
+          echo "🚀 Running Playwright tests..."
           if [ -f config/playwright.config.js ]; then
-            npx playwright test -c config/playwright.config.js
+            npx playwright test -c config/playwright.config.js | tee test-output.log
           elif [ -f playwright.config.js ]; then
-            npx playwright test -c playwright.config.js
+            npx playwright test -c playwright.config.js | tee test-output.log
           else
-            npx playwright test
+            npx playwright test | tee test-output.log
           fi
+          echo "✅ Tests completed"
         env:
           CI: true
+
+      - name: Save test output for parsing
+        if: always()
+        run: |
+          echo "📝 Saving test output for parsing..."
+          if [ -f "test-output.log" ]; then
+            echo "✅ Test output saved successfully"
+            echo "🔍 Test output summary:"
+            tail -20 test-output.log
+          else
+            echo "⚠️ No test output file found"
+          fi
 
       - name: Parse and set test data
         id: get-test-data
@@ -63,6 +84,17 @@ jobs:
           FAILED_COUNT=0
           TOTAL_COUNT=0
           TEST_DETAILS=""
+          
+          # Debug: Check what's in the working directory
+          echo "🔍 Debug: Current directory contents"
+          ls -la
+          echo "🔍 Debug: test-results directory status"
+          if [ -d "test-results" ]; then
+            echo "📁 test-results directory exists, contents:"
+            ls -la test-results/
+          else
+            echo "❌ test-results directory does not exist"
+          fi
           
           # Try to read from Playwright JSON report - FIXED PATH
           if [ -f "test-results/results.json" ]; then
@@ -140,6 +172,35 @@ jobs:
               fi
             fi
             
+          # Alternative: try to parse from test-output.log
+          elif [ -f "test-output.log" ]; then
+            echo "🔍 Parsing from test console output..."
+            
+            # Extract test counts from console output
+            PASSED_COUNT=$(grep -o '[0-9]* passed' test-output.log | grep -o '[0-9]*' | head -1 || echo "0")
+            FAILED_COUNT=$(grep -o '[0-9]* failed' test-output.log | grep -o '[0-9]*' | head -1 || echo "0")
+            TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
+            
+            echo "📊 Extracted from console output:"
+            echo "   Total: $TOTAL_COUNT"
+            echo "   Passed: $PASSED_COUNT" 
+            echo "   Failed: $FAILED_COUNT"
+            
+            # Extract test details from console output
+            if [ "$PASSED_COUNT" -gt 0 ]; then
+              echo "✅ Adding passed tests from console output"
+              grep "✓ " test-output.log | while read line; do
+                TEST_DETAILS="${TEST_DETAILS}- ✅ ${line#*› }\n"
+              done || true
+            fi
+            
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              echo "❌ Adding failed tests from console output"
+              grep "✗ " test-output.log | while read line; do
+                TEST_DETAILS="${TEST_DETAILS}- ❌ ${line#*› }\n"
+              done || true
+            fi
+
           # Alternative: try to parse from test-results directory
           elif [ -d "test-results" ]; then
             echo "🔍 Parsing from test-results directory..."
@@ -311,7 +372,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*TC detailed*\n$TEST_DETAILS"
+                  "text": "*TC detailed*\\n$TEST_DETAILS"
                 }
               },
               {
@@ -378,6 +439,7 @@ jobs:
           name: playwright-report
           path: |
             test-results/
+            test-output.log
             playwright-report/
           retention-days: 30
 
