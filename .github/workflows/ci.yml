@@ -24,9 +24,9 @@ jobs:
       run: npm install || echo "npm install failed, trying npm ci"
       continue-on-error: true
     
-    # - name: Try npm ci if install failed
-    #   if: failure()
-    #   run: npm ci
+    - name: Try npm ci if install failed
+      if: failure()
+      run: npm install
     
     - name: Install Playwright
       run: npx playwright install --with-deps
