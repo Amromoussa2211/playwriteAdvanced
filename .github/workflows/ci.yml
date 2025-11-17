@@ -22,7 +22,6 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f package.json ]; then
-            # Check if package-lock.json exists
             if [ -f package-lock.json ]; then
               npm ci
             else
@@ -48,21 +47,9 @@ jobs:
         env:
           CI: true
 
-      - name: Debug: Check what files were created
-        if: always()
-        run: |
-          echo "🔍 Checking what files exist in the workspace..."
-          find . -name "*.json" -type f | head -20
-          echo ""
-          echo "📁 Contents of test-results directory:"
-          ls -la test-results/ 2>/dev/null || echo "test-results directory not found"
-          echo ""
-          echo "📁 Contents of playwright-report directory:"
-          ls -la playwright-report/ 2>/dev/null || echo "playwright-report directory not found"
-
       - name: Parse and set test data
         id: get-test-data
-        if: always()  # Run even if tests fail
+        if: always()
         run: |
           echo "🏗️ Getting commit SHA..."
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
@@ -77,13 +64,9 @@ jobs:
           TOTAL_COUNT=0
           TEST_DETAILS=""
           
-          # Try to read from Playwright JSON report if it exists - FIXED PATH
+          # Try to read from Playwright JSON report - FIXED PATH
           if [ -f "test-results/results.json" ]; then
             echo "🔍 Found Playwright JSON report, parsing..."
-            
-            # Show sample of the JSON structure for debugging
-            echo "📋 JSON structure sample:"
-            head -10 test-results/results.json
             
             # Parse JSON using jq
             TOTAL_COUNT=$(jq '.suites[].specs[].tests | length' test-results/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
@@ -102,7 +85,7 @@ jobs:
             if [ "$PASSED_COUNT" -gt 0 ]; then
               echo "✅ Adding $PASSED_COUNT passed tests"
               
-              # Extract passed test names (if available)
+              # Extract passed test names
               PASSED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="passed") | .title] | join("; ")' test-results/results.json 2>/dev/null || echo "")
               
               echo "🔍 Passed tests found: $PASSED_TESTS"
@@ -115,7 +98,7 @@ jobs:
                   fi
                 done
               else
-                # Fallback to generic names if test titles not available
+                # Fallback to generic names
                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التنقل (Navigation Tests)\n"
                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات النماذج (Form Tests)\n"
                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الاستجابة (Responsive Tests)\n"
@@ -173,7 +156,6 @@ jobs:
             
             # If we have result files, extract test names
             if [ $TOTAL_COUNT -gt 0 ]; then
-              # Read test titles from result files
               for file in test-results/*-passed.json; do
                 if [ -f "$file" ]; then
                   TEST_TITLE=$(jq -r '.title' "$file" 2>/dev/null || echo "اختبار غير محدد")
@@ -189,12 +171,8 @@ jobs:
               done
             fi
             
-          # Last resort: parse from Playwright output (line reporter)
           else
-            echo "⚠️ Could not find JSON results, using Playwright output parsing..."
-            
-            # This will be populated by the previous step if it exists
-            # For now, set to empty and let the script proceed
+            echo "⚠️ Could not find JSON results"
             PASSED_COUNT=0
             FAILED_COUNT=0
             TOTAL_COUNT=0
@@ -204,7 +182,6 @@ jobs:
           if [ "$TOTAL_COUNT" -eq 0 ] && [ "$PASSED_COUNT" -eq 0 ] && [ "$FAILED_COUNT" -eq 0 ]; then
             echo "⚠️ No test results found, using fallback data"
             
-            # Check if there are any test files to suggest tests were run
             if find . -name "*.spec.js" -o -name "*.spec.ts" | head -1 | grep -q .; then
               echo "🔍 Found test files but no results - tests may have failed to execute"
               PASSED_COUNT=0
@@ -242,11 +219,9 @@ jobs:
           echo "   Passed: $PASSED_COUNT"
           echo "   Failed: $FAILED_COUNT"
           echo "   Test details length: ${#TEST_DETAILS} characters"
-          echo "   Test details:"
-          echo -e "$TEST_DETAILS"
 
       - name: Test Slack webhook connectivity
-        if: always()  # Run even if tests fail
+        if: always()
         run: |
           echo "🔍 Testing Slack webhook configuration..."
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
@@ -258,7 +233,7 @@ jobs:
             if [[ "$SLACK_WEBHOOK_URL" == *"https://hooks.slack.com"* ]]; then
               echo "✅ Webhook URL format looks correct"
             else
-              echo "❌ Webhook URL format might be incorrect (should start with https://hooks.slack.com)"
+              echo "❌ Webhook URL format might be incorrect"
             fi
             
             # Test with a simple curl request
@@ -269,17 +244,11 @@ jobs:
             
             if [ "$HTTP_TEST" = "200" ]; then
               echo "✅ Webhook test successful! (HTTP $HTTP_TEST)"
-            elif [ "$HTTP_TEST" = "404" ]; then
-              echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Channel or webhook issue"
-              echo "💡 Try testing in a different channel (e.g., #general) or check webhook URL"
-            elif [ "$HTTP_TEST" = "403" ]; then
-              echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Permission issue"
-              echo "💡 Check webhook permissions and channel access"
             else
-              echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Unknown issue"
+              echo "❌ Webhook test failed (HTTP $HTTP_TEST)"
             fi
           else
-            echo "❌ SLACK_WEBHOOK_URL is not set - Slack notification will be skipped"
+            echo "❌ SLACK_WEBHOOK_URL is not set"
           fi
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -297,7 +266,7 @@ jobs:
           echo "   Failed: $FAILED_COUNT"
           echo "   Test details length: ${#TEST_DETAILS}"
           
-          # Create the message content using environment variables
+          # Create the message content
           cat > slack_payload.json << EOF
           {
             "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}",
@@ -342,7 +311,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*TC detailed*\n$TEST_DETAILS"
+                  "text": "*TC detailed*\\n$TEST_DETAILS"
                 }
               },
               {
@@ -370,7 +339,7 @@ jobs:
           }
           EOF
           
-          # Send notification with curl for better error handling
+          # Send notification with curl
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
             echo "📤 Sending notification via curl..."
             HTTP_CODE=$(curl -s -w "%{http_code}" -X POST \
@@ -382,28 +351,11 @@ jobs:
             
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Slack notification sent successfully!"
-            elif [ "$HTTP_CODE" = "404" ]; then
-              echo "❌ Slack 404 Error - Possible issues:"
-              echo "   • Channel #test-notifications doesn't exist in your workspace"
-              echo "   • Webhook URL is invalid or expired"
-              echo "   • Webhook is archived or deleted"
-              echo "🔧 Quick Solutions:"
-              echo "   1. Check if #test-notifications channel exists"
-              echo "   2. Try sending to #general channel instead"
-              echo "   3. Regenerate your Slack webhook URL"
-              echo "   4. Verify webhook is pointing to correct channel"
-            elif [ "$HTTP_CODE" = "403" ]; then
-              echo "❌ Slack 403 Error - Permission issue"
-              echo "🔧 Solutions:"
-              echo "   1. Check webhook has posting permissions"
-              echo "   2. Verify bot has access to the channel"
-              echo "   3. Ensure channel allows webhooks"
             else
               echo "❌ Slack notification failed with HTTP code: $HTTP_CODE"
-              echo "🔧 Check webhook URL and Slack workspace configuration"
             fi
             
-            # Try alternative simple message if webhook test failed
+            # Try alternative simple message if webhook failed
             if [ "$HTTP_CODE" != "200" ]; then
               echo "🔄 Trying simple test message..."
               curl -s -X POST \
@@ -412,7 +364,7 @@ jobs:
                 "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "Simple test also failed"
             fi
           else
-            echo "⚠️ No Slack webhook URL configured - skipping notification"
+            echo "⚠️ No Slack webhook URL configured"
           fi
           
           echo "🏁 Slack notification step completed"
