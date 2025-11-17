@@ -1,4 +1,4 @@
-name: Playwright Tests with Slack Notification
+name: Playwright Tests with Slack Notification - FIXED
 
 on:
   push:
@@ -48,6 +48,18 @@ jobs:
         env:
           CI: true
 
+      - name: Debug: Check what files were created
+        if: always()
+        run: |
+          echo "🔍 Checking what files exist in the workspace..."
+          find . -name "*.json" -type f | head -20
+          echo ""
+          echo "📁 Contents of test-results directory:"
+          ls -la test-results/ 2>/dev/null || echo "test-results directory not found"
+          echo ""
+          echo "📁 Contents of playwright-report directory:"
+          ls -la playwright-report/ 2>/dev/null || echo "playwright-report directory not found"
+
       - name: Parse and set test data
         id: get-test-data
         if: always()  # Run even if tests fail
@@ -65,14 +77,23 @@ jobs:
           TOTAL_COUNT=0
           TEST_DETAILS=""
           
-          # Try to read from Playwright JSON report if it exists
-          if [ -f "playwright-report/results.json" ]; then
+          # Try to read from Playwright JSON report if it exists - FIXED PATH
+          if [ -f "test-results/results.json" ]; then
             echo "🔍 Found Playwright JSON report, parsing..."
             
+            # Show sample of the JSON structure for debugging
+            echo "📋 JSON structure sample:"
+            head -10 test-results/results.json
+            
             # Parse JSON using jq
-            TOTAL_COUNT=$(jq '.suites[].specs[].tests | length' playwright-report/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
-            PASSED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="passed")] | length' playwright-report/results.json 2>/dev/null || echo "0")
-            FAILED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="failed")] | length' playwright-report/results.json 2>/dev/null || echo "0")
+            TOTAL_COUNT=$(jq '.suites[].specs[].tests | length' test-results/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
+            PASSED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="passed")] | length' test-results/results.json 2>/dev/null || echo "0")
+            FAILED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="failed")] | length' test-results/results.json 2>/dev/null || echo "0")
+            
+            echo "🔍 Raw counts from JSON:"
+            echo "   Total: $TOTAL_COUNT"
+            echo "   Passed: $PASSED_COUNT"
+            echo "   Failed: $FAILED_COUNT"
             
             # Generate test details from actual test results
             echo "🔍 Generating test details from actual results..."
@@ -82,9 +103,11 @@ jobs:
               echo "✅ Adding $PASSED_COUNT passed tests"
               
               # Extract passed test names (if available)
-              PASSED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="passed") | .title] | join("; ")' playwright-report/results.json 2>/dev/null || echo "")
+              PASSED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="passed") | .title] | join("; ")' test-results/results.json 2>/dev/null || echo "")
               
-              if [ -n "$PASSED_TESTS" ] && [ "$PASSED_TESTS" != "null" ]; then
+              echo "🔍 Passed tests found: $PASSED_TESTS"
+              
+              if [ -n "$PASSED_TESTS" ] && [ "$PASSED_TESTS" != "null" ] && [ "$PASSED_TESTS" != "" ]; then
                 IFS=';' read -ra TEST_NAMES <<< "$PASSED_TESTS"
                 for test_name in "${TEST_NAMES[@]}"; do
                   if [ -n "$test_name" ] && [ "$test_name" != " " ]; then
@@ -107,14 +130,16 @@ jobs:
               echo "❌ Adding $FAILED_COUNT failed tests"
               
               # Extract failed test names
-              FAILED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="failed") | .title] | join("; ")' playwright-report/results.json 2>/dev/null || echo "")
+              FAILED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="failed") | .title] | join("; ")' test-results/results.json 2>/dev/null || echo "")
               
-              if [ -n "$FAILED_TESTS" ] && [ "$FAILED_TESTS" != "null" ]; then
+              echo "🔍 Failed tests found: $FAILED_TESTS"
+              
+              if [ -n "$FAILED_TESTS" ] && [ "$FAILED_TESTS" != "null" ] && [ "$FAILED_TESTS" != "" ]; then
                 IFS=';' read -ra TEST_NAMES <<< "$FAILED_TESTS"
                 for test_name in "${TEST_NAMES[@]}"; do
                   if [ -n "$test_name" ] && [ "$test_name" != " " ]; then
                     # Add browser info if available
-                    BROWSER_INFO=$(jq -r '.suites[].specs[].tests[] | select(.title=="'"$test_name"'") | .annotations[]? | select(.type=="browser") | .name' playwright-report/results.json 2>/dev/null | head -1 || echo "")
+                    BROWSER_INFO=$(jq -r '.suites[].specs[].tests[] | select(.title=="'"$test_name"'") | .annotations[]? | select(.type=="browser") | .name' test-results/results.json 2>/dev/null | head -1 || echo "")
                     
                     if [ -n "$BROWSER_INFO" ]; then
                       TEST_DETAILS="${TEST_DETAILS}- ❌ [$BROWSER_INFO] › $test_name\n"
@@ -217,6 +242,8 @@ jobs:
           echo "   Passed: $PASSED_COUNT"
           echo "   Failed: $FAILED_COUNT"
           echo "   Test details length: ${#TEST_DETAILS} characters"
+          echo "   Test details:"
+          echo -e "$TEST_DETAILS"
 
       - name: Test Slack webhook connectivity
         if: always()  # Run even if tests fail
@@ -401,6 +428,7 @@ jobs:
             test-results/
             playwright-report/
           retention-days: 30
+
 # name: Playwright Tests with Slack Notification
 
 # on:
