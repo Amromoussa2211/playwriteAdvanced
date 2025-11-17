@@ -50,26 +50,6 @@ jobs:
           # Store exit code for later
           echo $TEST_EXIT_CODE > test-exit-code.txt
 
-      - name: Check if tests actually ran
-        if: always()
-        run: |
-          echo "========================================="
-          echo "Verifying Test Execution"
-          echo "========================================="
-          
-          if [ -f "test-console.log" ]; then
-            echo "✓ Test console log exists"
-            echo ""
-            echo "Console output:"
-            cat test-console.log
-          else
-            echo "✗ No console log found"
-          fi
-          
-          echo ""
-          echo "Checking for test results files:"
-          ls -la | grep -E "(test-results|playwright-report|\.json)" || echo "No test output files found"
-
       - name: Parse test results and send Slack notification
         if: always()
         env:
@@ -79,149 +59,86 @@ jobs:
           echo "Parsing Test Results"
           echo "========================================="
           
-          # Get exit code
-          TEST_EXIT_CODE=0
-          if [ -f "test-exit-code.txt" ]; then
-            TEST_EXIT_CODE=$(cat test-exit-code.txt)
-          fi
-          echo "Test exit code: $TEST_EXIT_CODE"
-          
           # Initialize variables
           TOTAL_TESTS=0
           PASSED_TESTS=0
           FAILED_TESTS=0
-          TEST_DETAILS=""
-          EXECUTION_STATUS="Unknown"
+          FAILED_LIST=""
+          PASSED_LIST=""
           
-          # First, check if tests actually executed by looking at console output
+          # Check if we have test console log
           if [ ! -f "test-console.log" ]; then
-            echo "ERROR: No test execution log found!"
-            EXECUTION_STATUS="Tests did not execute"
-            TEST_DETAILS="- :x: Tests failed to execute - check GitHub Actions logs"
+            echo "ERROR: No test console log found"
+            FAILED_LIST="- :x: Test execution log not found"
           else
-            echo "Console log exists, checking content..."
+            echo "Parsing test results from console output..."
             
-            # Check if the log shows tests running
-            if grep -q "Running.*test.*using.*worker" test-console.log; then
-              echo "✓ Tests appear to have executed"
-              EXECUTION_STATUS="Executed"
-            else
-              echo "✗ No evidence of test execution in logs"
-              EXECUTION_STATUS="Possibly failed to start"
-            fi
+            # Parse console output for test results
+            # Playwright list reporter shows:
+            #   ✓ [browser] › file › test name (time)
+            #   ✗ [browser] › file › test name (time)
             
-            # Now try to parse JSON results
-            # Playwright with json reporter should create a results file
-            JSON_FILE=""
+            # Extract FAILED tests (with ✗ or ×)
+            FAILED_LIST=$(grep -E "^\s*[✗×]" test-console.log | while read line; do
+              # Remove leading whitespace and the symbol
+              clean_line=$(echo "$line" | sed 's/^[[:space:]]*//' | sed 's/^[✗×][[:space:]]*//')
+              # Add Slack emoji
+              echo "- :x: $clean_line"
+            done)
             
-            # Look for JSON output files
-            if [ -f "test-results.json" ]; then
-              JSON_FILE="test-results.json"
-            elif [ -f "results.json" ]; then
-              JSON_FILE="results.json"
-            elif [ -f "test-results/results.json" ]; then
-              JSON_FILE="test-results/results.json"
-            else
-              # Check if JSON might be in console output
-              echo "No standard JSON file found, checking console output..."
-            fi
+            # Extract PASSED tests (with ✓)
+            PASSED_LIST=$(grep -E "^\s*✓" test-console.log | while read line; do
+              # Remove leading whitespace and the symbol
+              clean_line=$(echo "$line" | sed 's/^[[:space:]]*//' | sed 's/^✓[[:space:]]*//')
+              # Add Slack emoji
+              echo "- :white_check_mark: $clean_line"
+            done)
             
-            # If we found a JSON file, parse it
-            if [ -n "$JSON_FILE" ] && [ -f "$JSON_FILE" ]; then
-              echo "Found JSON file: $JSON_FILE"
+            # Count tests from summary line
+            if grep -qE "[0-9]+ (passed|failed)" test-console.log; then
+              PASSED_TESTS=$(grep -oP '(\d+) passed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
+              FAILED_TESTS=$(grep -oP '(\d+) failed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
+              TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
               
-              if jq empty "$JSON_FILE" 2>/dev/null; then
-                echo "Valid JSON, parsing tests..."
-                
-                # Extract all tests recursively
-                ALL_TESTS=$(jq -r '
-                  def walk_tests:
-                    if .specs then
-                      .specs[] | 
-                      .title as $spec_title |
-                      .file as $file |
-                      (.tests[]? | 
-                        {
-                          title: $spec_title,
-                          project: (.projectName // ""),
-                          status: (.status // "unknown"),
-                          file: $file
-                        }
-                      )
-                    else empty end,
-                    if .suites then .suites[] | walk_tests else empty end
-                  ;
-                  [.suites[]? | walk_tests]
-                ' "$JSON_FILE" 2>/dev/null)
-                
-                TOTAL_TESTS=$(echo "$ALL_TESTS" | jq 'length' 2>/dev/null || echo "0")
-                
-                if [ "$TOTAL_TESTS" -gt 0 ]; then
-                  # Get failed tests
-                  FAILED_LIST=$(echo "$ALL_TESTS" | jq -r '
-                    .[] | 
-                    select(.status == "failed" or .status == "timedOut" or .status == "interrupted") |
-                    if .project != "" then
-                      "- :x: [\(.project)] \(.title)"
-                    else
-                      "- :x: \(.title)"
-                    end
-                  ' 2>/dev/null)
-                  
-                  # Get passed tests
-                  PASSED_LIST=$(echo "$ALL_TESTS" | jq -r '
-                    .[] | 
-                    select(.status == "passed" or .status == "expected") |
-                    if .project != "" then
-                      "- :white_check_mark: [\(.project)] \(.title)"
-                    else
-                      "- :white_check_mark: \(.title)"
-                    end
-                  ' 2>/dev/null)
-                  
-                  FAILED_TESTS=$(echo "$ALL_TESTS" | jq '[.[] | select(.status == "failed" or .status == "timedOut" or .status == "interrupted")] | length' 2>/dev/null || echo "0")
-                  PASSED_TESTS=$(echo "$ALL_TESTS" | jq '[.[] | select(.status == "passed" or .status == "expected")] | length' 2>/dev/null || echo "0")
-                  
-                  # Combine details
-                  if [ -n "$FAILED_LIST" ] && [ "$FAILED_LIST" != "" ]; then
-                    TEST_DETAILS="$FAILED_LIST"
-                  fi
-                  
-                  if [ -n "$PASSED_LIST" ] && [ "$PASSED_LIST" != "" ]; then
-                    if [ -n "$TEST_DETAILS" ]; then
-                      TEST_DETAILS=$(printf "%s\n%s" "$TEST_DETAILS" "$PASSED_LIST")
-                    else
-                      TEST_DETAILS="$PASSED_LIST"
-                    fi
-                  fi
-                fi
-              else
-                echo "JSON file is invalid"
+              echo "Found: Total=$TOTAL_TESTS, Passed=$PASSED_TESTS, Failed=$FAILED_TESTS"
+            else
+              # Fallback: count from extracted lists
+              if [ -n "$FAILED_LIST" ]; then
+                FAILED_TESTS=$(echo "$FAILED_LIST" | grep -c "^- :x:" || echo "0")
               fi
+              if [ -n "$PASSED_LIST" ]; then
+                PASSED_TESTS=$(echo "$PASSED_LIST" | grep -c "^- :white_check_mark:" || echo "0")
+              fi
+              TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
             fi
             
-            # If we still don't have results, try parsing from console output
-            if [ "$TOTAL_TESTS" -eq 0 ]; then
-              echo "No JSON results, trying to parse console output..."
-              
-              # Look for Playwright's summary line like "3 passed (5s)"
-              if grep -qE "[0-9]+ (passed|failed)" test-console.log; then
-                PASSED_TESTS=$(grep -oP '(\d+) passed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
-                FAILED_TESTS=$(grep -oP '(\d+) failed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
-                TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
-                
-                echo "Extracted from console: Total=$TOTAL_TESTS, Passed=$PASSED_TESTS, Failed=$FAILED_TESTS"
-                
-                # Try to extract individual test results
-                TEST_DETAILS=$(grep -E "^\s*[✓✗×]" test-console.log | sed 's/^  *//' | sed 's/✓/:white_check_mark:/g' | sed 's/[✗×]/:x:/g' | sed 's/^/- /' || echo "")
-                
-                if [ -z "$TEST_DETAILS" ]; then
-                  TEST_DETAILS="Tests executed but detailed results could not be parsed.\nCheck GitHub Actions logs for full output."
-                fi
-              else
-                echo "No test summary found in console output"
-                TEST_DETAILS="- :warning: Tests may not have executed properly\n- Check GitHub Actions logs for details"
-              fi
+            echo "Parsed: $FAILED_TESTS failed, $PASSED_TESTS passed"
+          fi
+          
+          # Combine test details: FAILED FIRST, then PASSED
+          TEST_DETAILS=""
+          
+          if [ -n "$FAILED_LIST" ] && [ "$FAILED_LIST" != "" ]; then
+            TEST_DETAILS="$FAILED_LIST"
+            echo "Added $(echo "$FAILED_LIST" | wc -l) failed tests to output"
+          fi
+          
+          if [ -n "$PASSED_LIST" ] && [ "$PASSED_LIST" != "" ]; then
+            if [ -n "$TEST_DETAILS" ]; then
+              # Add blank line between failed and passed
+              TEST_DETAILS=$(printf "%s\n\n%s" "$TEST_DETAILS" "$PASSED_LIST")
+            else
+              TEST_DETAILS="$PASSED_LIST"
+            fi
+            echo "Added $(echo "$PASSED_LIST" | wc -l) passed tests to output"
+          fi
+          
+          # If no details extracted, provide fallback
+          if [ -z "$TEST_DETAILS" ] || [ "$TEST_DETAILS" == "" ]; then
+            if [ "$TOTAL_TESTS" -gt 0 ]; then
+              TEST_DETAILS="$TOTAL_TESTS tests completed. Check GitHub Actions logs for details."
+            else
+              TEST_DETAILS="No test results found. Check GitHub Actions logs."
             fi
           fi
           
@@ -245,13 +162,16 @@ jobs:
             STATUS_COLOR="#36a64f"
           fi
           
-          # Add execution status to details if there was an issue
-          if [ "$EXECUTION_STATUS" != "Executed" ] && [ "$EXECUTION_STATUS" != "Unknown" ]; then
-            TEST_DETAILS="⚠️ Execution Status: $EXECUTION_STATUS\n\n$TEST_DETAILS"
-          fi
-          
           # Escape for JSON
           TEST_DETAILS_ESCAPED=$(echo "$TEST_DETAILS" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          
+          echo ""
+          echo "Final Summary:"
+          echo "  Status: $STATUS_TEXT"
+          echo "  Total: $TOTAL_TESTS"
+          echo "  Passed: $PASSED_TESTS"
+          echo "  Failed: $FAILED_TESTS"
+          echo ""
           
           # Create Slack message
           SLACK_MESSAGE=$(cat << EOF
@@ -311,7 +231,7 @@ jobs:
           
           echo ""
           echo "========================================="
-          echo "Summary: Total=$TOTAL_TESTS | Passed=$PASSED_TESTS | Failed=$FAILED_TESTS"
+          echo "Notification sent successfully"
           echo "========================================="
 
       - uses: actions/upload-artifact@v4
