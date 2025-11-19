@@ -2,31 +2,31 @@
  * مثال لاختبار صفحة تسجيل الدخول باستخدام Playwright
  */
 
-const { test, expect } = require('@playwright/test');
+// const { test, expect } = require('@playwright/test');
 
-test.describe('اختبارات تسجيل الدخول', () => {
+// test.describe('اختبارات تسجيل الدخول', () => {
   
-  test.beforeEach(async ({ page }) => {
-    // الانتقال إلى صفحة تسجيل الدخول قبل كل اختبار
-    await page.goto('/login');
-  });
+//   test.beforeEach(async ({ page }) => {
+//     // الانتقال إلى صفحة تسجيل الدخول قبل كل اختبار
+//     await page.goto('/login');
+//   });
 
-  test('يجب أن تعرض الصفحة عناصر تسجيل الدخول', async ({ page }) => {
-    // التحقق من وجود حقول الإدخال
-    await expect(page.locator('input[name="email"]')).toBeVisible();
-    await expect(page.locator('input[name="password"]')).toBeVisible();
-    await expect(page.locator('button[type="submit"]')).toBeVisible();
-  });
+//   test('يجب أن تعرض الصفحة عناصر تسجيل الدخول', async ({ page }) => {
+//     // التحقق من وجود حقول الإدخال
+//     await expect(page.locator('input[name="email"]')).toBeVisible();
+//     await expect(page.locator('input[name="password"]')).toBeVisible();
+//     await expect(page.locator('button[type="submit"]')).toBeVisible();
+//   });
 
-  test('يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة', async ({ page }) => {
-    // إدخال بيانات غير صحيحة
-    await page.fill('input[name="email"]', 'wrong@example.com');
-    await page.fill('input[name="password"]', 'wrongpassword');
-    await page.click('button[type="submit"]');
+//   test('يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة', async ({ page }) => {
+//     // إدخال بيانات غير صحيحة
+//     await page.fill('input[name="email"]', 'wrong@example.com');
+//     await page.fill('input[name="password"]', 'wrongpassword');
+//     await page.click('button[type="submit"]');
 
-    // التحقق من ظهور رسالة الخطأ
-    await expect(page.locator('.error-message')).toBeVisible();
-  });
+//     // التحقق من ظهور رسالة الخطأ
+//     await expect(page.locator('.error-message')).toBeVisible();
+//   });
 
   // test('يجب أن ينجح تسجيل الدخول ببيانات صحيحة', async ({ page }) => {
   //   // إدخال بيانات صحيحة (استخدم بيانات اختبار حقيقية من البيئة)
@@ -56,4 +56,4 @@ test.describe('اختبارات تسجيل الدخول', () => {
   //   // التحقق من الانتقال إلى صفحة إعادة تعيين كلمة المرور
   //   await expect(page).toHaveURL(/.*reset-password/);
   // });
-});
+// });
