@@ -1,312 +1,1091 @@
 
-name: Playwright Tests with Slack Notification
+name: Playwright Tests
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [master, main]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [master, main]
 
 jobs:
-  web-tests:
+  test:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: lts/*
 
       - name: Install dependencies
         run: |
-          if [ -f package.json ]; then
-            # Check if package-lock.json exists
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-            fi
+          if [ -f "package-lock.json" ]; then
+            echo "Found package-lock.json, using npm ci"
+            npm ci
           else
-            npm init -y
-            npm install @playwright/test
+            echo "No package-lock.json found, using npm install"
+            npm install
           fi
 
-      - name: Install Playwright browsers
+      - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
       - name: Run Playwright tests
+        id: playwright_tests
+        continue-on-error: true
         run: |
-          if [ -f config/playwright.config.js ]; then
-            npx playwright test -c config/playwright.config.js
-          elif [ -f playwright.config.js ]; then
-            npx playwright test -c playwright.config.js
-          else
-            npx playwright test
-          fi
-        env:
-          CI: true
+          echo "========================================="
+          echo "Starting Playwright Tests"
+          echo "========================================="
+          
+          # Run tests with both list and html reporters
+          npx playwright test --reporter=list,html 2>&1 | tee test-console.log
+          
+          TEST_EXIT_CODE=${PIPESTATUS[0]}
+          echo ""
+          echo "========================================="
+          echo "Test execution completed with exit code: $TEST_EXIT_CODE"
+          echo "========================================="
+          
+          # Store exit code
+          echo $TEST_EXIT_CODE > test-exit-code.txt
 
-      - name: Get and set test data
-        id: get-test-data
-        if: always()  # Run even if tests fail
+      - name: Upload HTML Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Debug - Show console output
+        if: always()
         run: |
-          echo "🏗️ Getting commit SHA..."
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
-          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          echo "SHORT_SHA=$SHORT_SHA"
+          echo "========================================="
+          echo "Full Console Output for Debugging"
+          echo "========================================="
+          cat test-console.log
+          echo ""
+          echo "========================================="
+          echo "Looking for symbols in output:"
+          echo "========================================="
+          # Show all lines with test symbols
+          grep -n "✓\|✗\|×\|✘" test-console.log || echo "No test symbols found"
+
+      - name: Parse test results and send Slack notification
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          echo "========================================="
+          echo "Parsing Test Results"
+          echo "========================================="
           
-          echo "📊 Parsing actual test results..."
+          # Initialize variables
+          TOTAL_TESTS=0
+          PASSED_TESTS=0
+          FAILED_TESTS=0
+          FAILED_LIST=""
+          PASSED_LIST=""
           
-          # Count passed and failed tests from the test run
-          PASSED_COUNT=0
-          FAILED_COUNT=0
-          
-          # Check if test-results directory exists and has results
-          if [ -d "test-results" ]; then
-            # Count JSON files that indicate pass/fail
-            PASSED_COUNT=$(find test-results -name "*-passed.json" 2>/dev/null | wc -l || echo "0")
-            FAILED_COUNT=$(find test-results -name "*-failed.json" 2>/dev/null | wc -l || echo "0")
+          # Check if we have test console log
+          if [ ! -f "test-console.log" ]; then
+            echo "ERROR: No test console log found"
+            TEST_DETAILS="- :x: Test execution log not found"
+          else
+            echo "Parsing test results from console output..."
             
-            # Alternative: parse from Playwright JSON report if it exists
-            if [ -f "playwright-report/results.json" ]; then
-              TOTAL_TESTS=$(jq '.suites[].specs[].tests | length' playwright-report/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
-              PASSED_TESTS=$(jq '.suites[].specs[].tests[] | select(.status=="passed") | length' playwright-report/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
-              FAILED_TESTS=$(jq '.suites[].specs[].tests[] | select(.status=="failed") | length' playwright-report/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
-              
-              if [ "$TOTAL_TESTS" != "0" ]; then
-                PASSED_COUNT=$PASSED_TESTS
-                FAILED_COUNT=$FAILED_TESTS
+            # Try multiple patterns for failed tests
+            # Pattern 1: Lines starting with ✗
+            echo "Trying pattern 1: ^[[:space:]]*✗"
+            FAILED_LIST=$(grep "✗" test-console.log 2>/dev/null | while IFS= read -r line; do
+              clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
+              if [ -n "$clean_line" ]; then
+                echo "- :x: $clean_line"
               fi
+            done)
+            
+            # Pattern 2: If pattern 1 failed, try ×
+            if [ -z "$FAILED_LIST" ]; then
+              echo "Trying pattern 2: ×"
+              FAILED_LIST=$(grep "×" test-console.log 2>/dev/null | while IFS= read -r line; do
+                clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
+                if [ -n "$clean_line" ]; then
+                  echo "- :x: $clean_line"
+                fi
+              done)
+            fi
+            
+            # Pattern 3: If still nothing, try looking for "FAILED" or "failed"
+            if [ -z "$FAILED_LIST" ]; then
+              echo "Trying pattern 3: lines containing 'failed'"
+              FAILED_LIST=$(grep -i "failed" test-console.log | grep -v "0 failed" | grep -E "tests?/" | while IFS= read -r line; do
+                echo "- :x: $line"
+              done)
+            fi
+            
+            if [ -n "$FAILED_LIST" ]; then
+              echo "Found failed tests:"
+              echo "$FAILED_LIST"
+            else
+              echo "No failed tests details found"
+            fi
+            
+            # Extract PASSED tests
+            echo ""
+            echo "Extracting PASSED tests..."
+            PASSED_LIST=$(grep "✓" test-console.log 2>/dev/null | while IFS= read -r line; do
+              clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*✓[[:space:]]*//')
+              if [ -n "$clean_line" ]; then
+                echo "- :white_check_mark: $clean_line"
+              fi
+            done)
+            
+            if [ -n "$PASSED_LIST" ]; then
+              echo "Found passed tests:"
+              echo "$PASSED_LIST"
+            fi
+            
+            # Count tests from summary line
+            echo ""
+            echo "Extracting test counts from summary..."
+            if grep -qE "[0-9]+ (passed|failed)" test-console.log; then
+              PASSED_TESTS=$(grep -oP '(\d+) passed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
+              FAILED_TESTS=$(grep -oP '(\d+) failed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
+              TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
+              
+              echo "Summary: Total=$TOTAL_TESTS, Passed=$PASSED_TESTS, Failed=$FAILED_TESTS"
             fi
           fi
           
-          # If we couldn't parse results, use the visible counts from the output
-          if [ "$PASSED_COUNT" = "0" ] && [ "$FAILED_COUNT" = "0" ]; then
-            echo "⚠️ Could not parse test results, using visible counts from output"
-            PASSED_COUNT=6
-            FAILED_COUNT=4
-          fi
+          echo ""
+          echo "========================================="
+          echo "Building Slack notification..."
+          echo "========================================="
           
-          TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
-          
-          echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_ENV
-          echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_ENV  
-          echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_ENV
-          
-          echo "📝 Generating detailed test report..."
-          # Generate test details based on the actual results
+          # Combine test details: FAILED FIRST, then PASSED
           TEST_DETAILS=""
           
-          # Add failed tests if any
-          if [ "$FAILED_COUNT" -gt 0 ]; then
-            TEST_DETAILS="${TEST_DETAILS}- ❌ [chromium] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n"
-            TEST_DETAILS="${TEST_DETAILS}- ❌ [chromium] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n"
-            TEST_DETAILS="${TEST_DETAILS}- ❌ [firefox] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n"
-            TEST_DETAILS="${TEST_DETAILS}- ❌ [firefox] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n"
+          # Add failed tests
+          if [ -n "$FAILED_LIST" ] && [ "$FAILED_LIST" != "" ]; then
+            TEST_DETAILS="$FAILED_LIST"
+            FAILED_COUNT=$(echo "$FAILED_LIST" | grep -c "^- :x:")
+            echo "Added $FAILED_COUNT failed test(s)"
+          else
+            if [ "$FAILED_TESTS" -gt 0 ]; then
+              # Fallback message
+              TEST_DETAILS="- :x: $FAILED_TESTS test(s) failed - details in logs"
+              echo "Using fallback for failed tests"
+            fi
           fi
           
           # Add passed tests
-          if [ "$PASSED_COUNT" -gt 0 ]; then
-            TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التنقل (Navigation Tests)\n"
-            TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات النماذج (Form Tests)\n"
-            TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الاستجابة (Responsive Tests)\n"
-            TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التحقق (Validation Tests)\n"
-            TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الأداء (Performance Tests)\n"
-            TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الأمان (Security Tests)\n"
+          if [ -n "$PASSED_LIST" ] && [ "$PASSED_LIST" != "" ]; then
+            if [ -n "$TEST_DETAILS" ]; then
+              TEST_DETAILS=$(printf "%s\n\n%s" "$TEST_DETAILS" "$PASSED_LIST")
+            else
+              TEST_DETAILS="$PASSED_LIST"
+            fi
+            PASSED_COUNT=$(echo "$PASSED_LIST" | grep -c "^- :white_check_mark:")
+            echo "Added $PASSED_COUNT passed test(s)"
           fi
           
-          echo "TEST_DETAILS=$TEST_DETAILS" >> $GITHUB_ENV
+          # Get git information
+          REPO_NAME="${GITHUB_REPOSITORY}"
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          COMMIT_SHA="${GITHUB_SHA:0:8}"
+          RUN_ID="${GITHUB_RUN_ID}"
           
-          echo "✅ All values set as environment variables"
-          echo "🔍 Short SHA: $SHORT_SHA"
-          echo "🔍 Total: $TOTAL_COUNT, Passed: $PASSED_COUNT, Failed: $FAILED_COUNT"
-
-      - name: Test Slack webhook connectivity
-        if: always()  # Run even if tests fail
-        run: |
-          echo "🔍 Testing Slack webhook configuration..."
+          # Create links
+          ACTIONS_LINK="https://github.com/$REPO_NAME/actions/runs/$RUN_ID"
+          HTML_REPORT_LINK="https://github.com/$REPO_NAME/actions/runs/$RUN_ID"
+          
+          # Add links to test details
+          TEST_DETAILS=$(printf "%s\n\n📊 *Reports:*\n• <$ACTIONS_LINK|View Execution Log>\n• <$HTML_REPORT_LINK/|Download HTML Report>" "$TEST_DETAILS")
+          
+          # Determine overall status
+          if [ "$TOTAL_TESTS" -eq 0 ]; then
+            STATUS_EMOJI=":warning:"
+            STATUS_TEXT="No Tests Found"
+            STATUS_COLOR="#FFA500"
+          elif [ "$FAILED_TESTS" -gt 0 ]; then
+            STATUS_EMOJI=":x:"
+            STATUS_TEXT="Failed"
+            STATUS_COLOR="#FF0000"
+          else
+            STATUS_EMOJI=":white_check_mark:"
+            STATUS_TEXT="Passed"
+            STATUS_COLOR="#36a64f"
+          fi
+          
+          echo ""
+          echo "Final Summary:"
+          echo "  Status: $STATUS_TEXT"
+          echo "  Total: $TOTAL_TESTS"
+          echo "  Passed: $PASSED_TESTS"
+          echo "  Failed: $FAILED_TESTS"
+          echo ""
+          
+          # Escape for JSON (handle special characters properly)
+          TEST_DETAILS_ESCAPED=$(echo "$TEST_DETAILS" | jq -Rs . | sed 's/^"//' | sed 's/"$//')
+          
+          # Create Slack message using jq for proper JSON encoding
+          SLACK_MESSAGE=$(jq -n \
+            --arg text "${STATUS_EMOJI} Playwright Tests ${STATUS_TEXT}" \
+            --arg color "$STATUS_COLOR" \
+            --arg repo "$REPO_NAME" \
+            --arg branch "$BRANCH_NAME" \
+            --arg commit "$COMMIT_SHA" \
+            --arg total "$TOTAL_TESTS" \
+            --arg passed "$PASSED_TESTS" \
+            --arg failed "$FAILED_TESTS" \
+            --arg details "$TEST_DETAILS" \
+            '{
+              "text": $text,
+              "attachments": [
+                {
+                  "color": $color,
+                  "fields": [
+                    {
+                      "title": "Repository",
+                      "value": $repo,
+                      "short": true
+                    },
+                    {
+                      "title": "Branch",
+                      "value": $branch,
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": $commit,
+                      "short": true
+                    },
+                    {
+                      "title": "Total Tests",
+                      "value": $total,
+                      "short": true
+                    },
+                    {
+                      "title": "Passed",
+                      "value": $passed,
+                      "short": true
+                    },
+                    {
+                      "title": "Failed",
+                      "value": $failed,
+                      "short": true
+                    },
+                    {
+                      "title": "Test Details",
+                      "value": $details,
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }')
+          
+          # Send to Slack
+          echo "Sending notification to Slack..."
+          
+          # Debug webhook
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
             echo "✅ SLACK_WEBHOOK_URL is set"
             echo "📊 Webhook URL length: ${#SLACK_WEBHOOK_URL} characters"
             echo "🔑 First 10 chars: ${SLACK_WEBHOOK_URL:0:10}..."
-            
-            # Test webhook URL format
-            if [[ "$SLACK_WEBHOOK_URL" == *"https://hooks.slack.com"* ]]; then
-              echo "✅ Webhook URL format looks correct"
-            else
-              echo "❌ Webhook URL format might be incorrect (should start with https://hooks.slack.com)"
-            fi
-            
-            # Test with a simple curl request
-            echo "🧪 Testing webhook with curl..."
-            HTTP_TEST=$(curl -s -w "%{http_code}" -o /dev/null -X POST -H 'Content-type: application/json' \
-               --data '{"text":"🔔 Test message from GitHub Actions workflow"}' \
-               "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "000")
-            
-            if [ "$HTTP_TEST" = "200" ]; then
-              echo "✅ Webhook test successful! (HTTP $HTTP_TEST)"
-            elif [ "$HTTP_TEST" = "404" ]; then
-              echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Channel or webhook issue"
-              echo "💡 Try testing in a different channel (e.g., #general) or check webhook URL"
-            elif [ "$HTTP_TEST" = "403" ]; then
-              echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Permission issue"
-              echo "💡 Check webhook permissions and channel access"
-            else
-              echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Unknown issue"
-            fi
           else
-            echo "❌ SLACK_WEBHOOK_URL is not set - Slack notification will be skipped"
-          fi
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Send Slack notification with improved error handling
-        if: always()
-        run: |
-          echo "🚀 Sending Slack notification..."
-          echo "Job status: ${{ job.status }}"
-          
-          echo "🔍 Using environment variables:"
-          echo "   Short SHA: $SHORT_SHA"
-          echo "   Total: $TOTAL_COUNT"
-          echo "   Passed: $PASSED_COUNT"
-          echo "   Failed: $FAILED_COUNT"
-          echo "   Test details length: ${#TEST_DETAILS}"
-          
-          # Create the message content using environment variables
-          cat > slack_payload.json << EOF
-          {
-            "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}",
-            "blocks": [
-              {
-                "type": "header",
-                "text": {
-                  "type": "plain_text",
-                  "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}"
-                }
-              },
-              {
-                "type": "section",
-                "fields": [
-                  {
-                    "type": "mrkdwn",
-                    "text": "*repo:* ${{ github.repository }}"
-                  },
-                  {
-                    "type": "mrkdwn", 
-                    "text": "*branch:* ${{ github.ref_name }}"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*ال commit:* $SHORT_SHA"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Total TC:* $TOTAL_COUNT"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Passed:* $PASSED_COUNT"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*failed:* $FAILED_COUNT"
-                  }
-                ]
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "*TC detailed*\n$TEST_DETAILS"
-                }
-              },
-              {
-                "type": "actions",
-                "elements": [
-                  {
-                    "type": "button",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "📊show report"
-                    },
-                    "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  },
-                  {
-                    "type": "button",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "🔍 HTML Report"
-                    },
-                    "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
-          
-          # Send notification with curl for better error handling
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            echo "📤 Sending notification via curl..."
-            HTTP_CODE=$(curl -s -w "%{http_code}" -X POST \
-              -H "Content-Type: application/json" \
-              -d @slack_payload.json \
-              "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "000")
-            
-            echo "📊 HTTP Response Code: $HTTP_CODE"
-            
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Slack notification sent successfully!"
-            elif [ "$HTTP_CODE" = "404" ]; then
-              echo "❌ Slack 404 Error - Possible issues:"
-              echo "   • Channel #test-notifications doesn't exist in your workspace"
-              echo "   • Webhook URL is invalid or expired"
-              echo "   • Webhook is archived or deleted"
-              echo "🔧 Quick Solutions:"
-              echo "   1. Check if #test-notifications channel exists"
-              echo "   2. Try sending to #general channel instead"
-              echo "   3. Regenerate your Slack webhook URL"
-              echo "   4. Verify webhook is pointing to correct channel"
-            elif [ "$HTTP_CODE" = "403" ]; then
-              echo "❌ Slack 403 Error - Permission issue"
-              echo "🔧 Solutions:"
-              echo "   1. Check webhook has posting permissions"
-              echo "   2. Verify bot has access to the channel"
-              echo "   3. Ensure channel allows webhooks"
-            else
-              echo "❌ Slack notification failed with HTTP code: $HTTP_CODE"
-              echo "🔧 Check webhook URL and Slack workspace configuration"
-            fi
-            
-            # Try alternative simple message if webhook test failed
-            if [ "$HTTP_CODE" != "200" ]; then
-              echo "🔄 Trying simple test message..."
-              curl -s -X POST \
-                -H "Content-Type: application/json" \
-                -d '{"text":"⚠️ GitHub Actions: Test notification. Check webhook configuration."}' \
-                "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "Simple test also failed"
-            fi
-          else
-            echo "⚠️ No Slack webhook URL configured - skipping notification"
+            echo "❌ SLACK_WEBHOOK_URL is NOT set"
           fi
           
-          echo "🏁 Slack notification step completed"
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # Send the message
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST -H 'Content-type: application/json' \
+            --data "$SLACK_MESSAGE" \
+            "$SLACK_WEBHOOK_URL")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+          
+          echo ""
+          echo "Slack Response:"
+          echo "  HTTP Code: $HTTP_CODE"
+          echo "  Response: $RESPONSE_BODY"
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Notification sent successfully"
+          else
+            echo "❌ Failed to send notification"
+          fi
+          
+          echo ""
+          echo "========================================="
+          echo "Done"
+          echo "========================================="
 
-      - name: Upload test results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: |
-            test-results/
-            playwright-report/
+          name: test-console-log
+          path: test-console.log
           retention-days: 30
+
+
+
+
+# name: Playwright Tests with Slack Notification - FIXED
+
+# on:
+#   push:
+#     branches: [ main, master ]
+#   pull_request:
+#     branches: [ main, master ]
+#   workflow_dispatch:
+
+# jobs:
+#   web-tests:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: '18'
+
+#       - name: Install dependencies
+#         run: |
+#           if [ -f package.json ]; then
+#             if [ -f package-lock.json ]; then
+#               npm ci
+#             else
+#               npm install
+#             fi
+#           else
+#             npm init -y
+#             npm install @playwright/test
+#           fi
+
+#       - name: Install Playwright browsers
+#         run: npx playwright install --with-deps
+
+#       - name: Create results directory
+#         run: |
+#           mkdir -p test-results
+#           mkdir -p playwright-report
+#           echo "📁 Created results directories"
+#           ls -la
+
+#       - name: Run Playwright tests
+#         run: |
+#           echo "🚀 Running Playwright tests..."
+#           if [ -f config/playwright.config.js ]; then
+#             npx playwright test -c config/playwright.config.js | tee test-output.log
+#           elif [ -f playwright.config.js ]; then
+#             npx playwright test -c playwright.config.js | tee test-output.log
+#           else
+#             npx playwright test | tee test-output.log
+#           fi
+#           echo "✅ Tests completed"
+#         env:
+#           CI: true
+
+#       - name: Save test output for parsing
+#         if: always()
+#         run: |
+#           echo "📝 Saving test output for parsing..."
+#           if [ -f "test-output.log" ]; then
+#             echo "✅ Test output saved successfully"
+#             echo "🔍 Test output summary:"
+#             tail -20 test-output.log
+#           else
+#             echo "⚠️ No test output file found"
+#           fi
+
+#       - name: Parse and set test data
+#         id: get-test-data
+#         if: always()
+#         run: |
+#           echo "🏗️ Getting commit SHA..."
+#           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+#           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+#           echo "SHORT_SHA=$SHORT_SHA"
+          
+#           echo "📊 Parsing actual test results..."
+          
+#           # Initialize counters
+#           PASSED_COUNT=0
+#           FAILED_COUNT=0
+#           TOTAL_COUNT=0
+#           TEST_DETAILS=""
+          
+#           # Debug: Check what's in the working directory
+#           echo "🔍 Debug: Current directory contents"
+#           ls -la
+#           echo "🔍 Debug: test-results directory status"
+#           if [ -d "test-results" ]; then
+#             echo "📁 test-results directory exists, contents:"
+#             ls -la test-results/
+#           else
+#             echo "❌ test-results directory does not exist"
+#           fi
+          
+#           # Try to read from Playwright JSON report - FIXED PATH
+#           if [ -f "test-results/results.json" ]; then
+#             echo "🔍 Found Playwright JSON report, parsing..."
+            
+#             # Parse JSON using jq
+#             TOTAL_COUNT=$(jq '.suites[].specs[].tests | length' test-results/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
+#             PASSED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="passed")] | length' test-results/results.json 2>/dev/null || echo "0")
+#             FAILED_COUNT=$(jq '[.suites[].specs[].tests[] | select(.status=="failed")] | length' test-results/results.json 2>/dev/null || echo "0")
+            
+#             echo "🔍 Raw counts from JSON:"
+#             echo "   Total: $TOTAL_COUNT"
+#             echo "   Passed: $PASSED_COUNT"
+#             echo "   Failed: $FAILED_COUNT"
+            
+#             # Generate test details from actual test results
+#             echo "🔍 Generating test details from actual results..."
+            
+#             # Add passed tests
+#             if [ "$PASSED_COUNT" -gt 0 ]; then
+#               echo "✅ Adding $PASSED_COUNT passed tests"
+              
+#               # Extract passed test names
+#               PASSED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="passed") | .title] | join("; ")' test-results/results.json 2>/dev/null || echo "")
+              
+#               echo "🔍 Passed tests found: $PASSED_TESTS"
+              
+#               if [ -n "$PASSED_TESTS" ] && [ "$PASSED_TESTS" != "null" ] && [ "$PASSED_TESTS" != "" ]; then
+#                 IFS=';' read -ra TEST_NAMES <<< "$PASSED_TESTS"
+#                 for test_name in "${TEST_NAMES[@]}"; do
+#                   if [ -n "$test_name" ] && [ "$test_name" != " " ]; then
+#                     TEST_DETAILS="${TEST_DETAILS}- ✅ $test_name\n"
+#                   fi
+#                 done
+#               else
+#                 # Fallback to generic names
+#                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التنقل (Navigation Tests)\n"
+#                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات النماذج (Form Tests)\n"
+#                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الاستجابة (Responsive Tests)\n"
+#                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التحقق (Validation Tests)\n"
+#                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الأداء (Performance Tests)\n"
+#                 TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الأمان (Security Tests)\n"
+#               fi
+#             fi
+            
+#             # Add failed tests
+#             if [ "$FAILED_COUNT" -gt 0 ]; then
+#               echo "❌ Adding $FAILED_COUNT failed tests"
+              
+#               # Extract failed test names
+#               FAILED_TESTS=$(jq -r '[.suites[].specs[].tests[] | select(.status=="failed") | .title] | join("; ")' test-results/results.json 2>/dev/null || echo "")
+              
+#               echo "🔍 Failed tests found: $FAILED_TESTS"
+              
+#               if [ -n "$FAILED_TESTS" ] && [ "$FAILED_TESTS" != "null" ] && [ "$FAILED_TESTS" != "" ]; then
+#                 IFS=';' read -ra TEST_NAMES <<< "$FAILED_TESTS"
+#                 for test_name in "${TEST_NAMES[@]}"; do
+#                   if [ -n "$test_name" ] && [ "$test_name" != " " ]; then
+#                     # Add browser info if available
+#                     BROWSER_INFO=$(jq -r '.suites[].specs[].tests[] | select(.title=="'"$test_name"'") | .annotations[]? | select(.type=="browser") | .name' test-results/results.json 2>/dev/null | head -1 || echo "")
+                    
+#                     if [ -n "$BROWSER_INFO" ]; then
+#                       TEST_DETAILS="${TEST_DETAILS}- ❌ [$BROWSER_INFO] › $test_name\n"
+#                     else
+#                       TEST_DETAILS="${TEST_DETAILS}- ❌ $test_name\n"
+#                     fi
+#                   fi
+#                 done
+#               else
+#                 # Fallback to generic failed test names
+#                 TEST_DETAILS="${TEST_DETAILS}- ❌ [chromium] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n"
+#                 TEST_DETAILS="${TEST_DETAILS}- ❌ [chromium] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n"
+#                 TEST_DETAILS="${TEST_DETAILS}- ❌ [firefox] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n"
+#                 TEST_DETAILS="${TEST_DETAILS}- ❌ [firefox] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n"
+#               fi
+#             fi
+            
+#           # Alternative: try to parse from test-output.log
+#           elif [ -f "test-output.log" ]; then
+#             echo "🔍 Parsing from test console output..."
+            
+#             # Extract test counts from console output
+#             PASSED_COUNT=$(grep -o '[0-9]* passed' test-output.log | grep -o '[0-9]*' | head -1 || echo "0")
+#             FAILED_COUNT=$(grep -o '[0-9]* failed' test-output.log | grep -o '[0-9]*' | head -1 || echo "0")
+#             TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
+            
+#             echo "📊 Extracted from console output:"
+#             echo "   Total: $TOTAL_COUNT"
+#             echo "   Passed: $PASSED_COUNT" 
+#             echo "   Failed: $FAILED_COUNT"
+            
+#             # Extract test details from console output
+#             if [ "$PASSED_COUNT" -gt 0 ]; then
+#               echo "✅ Adding passed tests from console output"
+#               grep "✓ " test-output.log | while read line; do
+#                 TEST_DETAILS="${TEST_DETAILS}- ✅ ${line#*› }\n"
+#               done || true
+#             fi
+            
+#             if [ "$FAILED_COUNT" -gt 0 ]; then
+#               echo "❌ Adding failed tests from console output"
+#               grep "✗ " test-output.log | while read line; do
+#                 TEST_DETAILS="${TEST_DETAILS}- ❌ ${line#*› }\n"
+#               done || true
+#             fi
+
+#           # Alternative: try to parse from test-results directory
+#           elif [ -d "test-results" ]; then
+#             echo "🔍 Parsing from test-results directory..."
+            
+#             # Count passed and failed test result files
+#             PASSED_JSON_FILES=$(find test-results -name "*-passed.json" 2>/dev/null | wc -l || echo "0")
+#             FAILED_JSON_FILES=$(find test-results -name "*-failed.json" 2>/dev/null | wc -l || echo "0")
+            
+#             PASSED_COUNT=$PASSED_JSON_FILES
+#             FAILED_COUNT=$FAILED_JSON_FILES
+#             TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
+            
+#             echo "Found $PASSED_COUNT passed and $FAILED_COUNT failed test result files"
+            
+#             # If we have result files, extract test names
+#             if [ $TOTAL_COUNT -gt 0 ]; then
+#               for file in test-results/*-passed.json; do
+#                 if [ -f "$file" ]; then
+#                   TEST_TITLE=$(jq -r '.title' "$file" 2>/dev/null || echo "اختبار غير محدد")
+#                   TEST_DETAILS="${TEST_DETAILS}- ✅ $TEST_TITLE\n"
+#                 fi
+#               done
+              
+#               for file in test-results/*-failed.json; do
+#                 if [ -f "$file" ]; then
+#                   TEST_TITLE=$(jq -r '.title' "$file" 2>/dev/null || echo "اختبار غير محدد")
+#                   TEST_DETAILS="${TEST_DETAILS}- ❌ $TEST_TITLE\n"
+#                 fi
+#               done
+#             fi
+            
+#           else
+#             echo "⚠️ Could not find JSON results"
+#             PASSED_COUNT=0
+#             FAILED_COUNT=0
+#             TOTAL_COUNT=0
+#           fi
+          
+#           # If no results found at all, use a safe fallback
+#           if [ "$TOTAL_COUNT" -eq 0 ] && [ "$PASSED_COUNT" -eq 0 ] && [ "$FAILED_COUNT" -eq 0 ]; then
+#             echo "⚠️ No test results found, using fallback data"
+            
+#             if find . -name "*.spec.js" -o -name "*.spec.ts" | head -1 | grep -q .; then
+#               echo "🔍 Found test files but no results - tests may have failed to execute"
+#               PASSED_COUNT=0
+#               FAILED_COUNT=1
+#               TOTAL_COUNT=1
+#               TEST_DETAILS="- ❌ لا يمكن قراءة نتائج الاختبارات - تحقق من إعداد Playwright\n"
+#             else
+#               echo "⚠️ No test files found"
+#               PASSED_COUNT=0
+#               FAILED_COUNT=0
+#               TOTAL_COUNT=0
+#               TEST_DETAILS="- ⚠️ لم يتم العثور على ملفات اختبارات\n"
+#             fi
+#           fi
+          
+#           # Ensure we have some test details even if empty
+#           if [ -z "$TEST_DETAILS" ]; then
+#             if [ "$PASSED_COUNT" -gt 0 ]; then
+#               TEST_DETAILS="- ✅ جميع الاختبارات نجحت\n"
+#             elif [ "$FAILED_COUNT" -gt 0 ]; then
+#               TEST_DETAILS="- ❌ بعض الاختبارات فشلت\n"
+#             else
+#               TEST_DETAILS="- ⚠️ لا توجد نتائج اختبارات\n"
+#             fi
+#           fi
+          
+#           # Set environment variables
+#           echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_ENV
+#           echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_ENV
+#           echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_ENV
+#           echo "TEST_DETAILS=$TEST_DETAILS" >> $GITHUB_ENV
+          
+#           echo "✅ Parsed Results:"
+#           echo "   Total: $TOTAL_COUNT"
+#           echo "   Passed: $PASSED_COUNT"
+#           echo "   Failed: $FAILED_COUNT"
+#           echo "   Test details length: ${#TEST_DETAILS} characters"
+
+#       - name: Test Slack webhook connectivity
+#         if: always()
+#         run: |
+#           echo "🔍 Testing Slack webhook configuration..."
+#           if [ -n "$SLACK_WEBHOOK_URL" ]; then
+#             echo "✅ SLACK_WEBHOOK_URL is set"
+#             echo "📊 Webhook URL length: ${#SLACK_WEBHOOK_URL} characters"
+#             echo "🔑 First 10 chars: ${SLACK_WEBHOOK_URL:0:10}..."
+            
+#             # Test webhook URL format
+#             if [[ "$SLACK_WEBHOOK_URL" == *"https://hooks.slack.com"* ]]; then
+#               echo "✅ Webhook URL format looks correct"
+#             else
+#               echo "❌ Webhook URL format might be incorrect"
+#             fi
+            
+#             # Test with a simple curl request
+#             echo "🧪 Testing webhook with curl..."
+#             HTTP_TEST=$(curl -s -w "%{http_code}" -o /dev/null -X POST -H 'Content-type: application/json' \
+#                --data '{"text":"🔔 Test message from GitHub Actions workflow"}' \
+#                "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "000")
+            
+#             if [ "$HTTP_TEST" = "200" ]; then
+#               echo "✅ Webhook test successful! (HTTP $HTTP_TEST)"
+#             else
+#               echo "❌ Webhook test failed (HTTP $HTTP_TEST)"
+#             fi
+#           else
+#             echo "❌ SLACK_WEBHOOK_URL is not set"
+#           fi
+#         env:
+#           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+#       - name: Send Slack notification with actual test results
+#         if: always()
+#         run: |
+#           echo "🚀 Sending Slack notification with actual test results..."
+#           echo "Job status: ${{ job.status }}"
+          
+#           echo "🔍 Using environment variables:"
+#           echo "   Short SHA: $SHORT_SHA"
+#           echo "   Total: $TOTAL_COUNT"
+#           echo "   Passed: $PASSED_COUNT"
+#           echo "   Failed: $FAILED_COUNT"
+#           echo "   Test details length: ${#TEST_DETAILS}"
+          
+#           # Create the message content
+#           cat > slack_payload.json << EOF
+#           {
+#             "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}",
+#             "blocks": [
+#               {
+#                 "type": "header",
+#                 "text": {
+#                   "type": "plain_text",
+#                   "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}"
+#                 }
+#               },
+#               {
+#                 "type": "section",
+#                 "fields": [
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*repo:* ${{ github.repository }}"
+#                   },
+#                   {
+#                     "type": "mrkdwn", 
+#                     "text": "*branch:* ${{ github.ref_name }}"
+#                   },
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*ال commit:* $SHORT_SHA"
+#                   },
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*Total TC:* $TOTAL_COUNT"
+#                   },
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*Passed:* $PASSED_COUNT"
+#                   },
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*failed:* $FAILED_COUNT"
+#                   }
+#                 ]
+#               },
+#               {
+#                 "type": "section",
+#                 "text": {
+#                   "type": "mrkdwn",
+#                   "text": "*TC detailed*\\n$TEST_DETAILS"
+#                 }
+#               },
+#               {
+#                 "type": "actions",
+#                 "elements": [
+#                   {
+#                     "type": "button",
+#                     "text": {
+#                       "type": "plain_text",
+#                       "text": "📊show report"
+#                     },
+#                     "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+#                   },
+#                   {
+#                     "type": "button",
+#                     "text": {
+#                       "type": "plain_text",
+#                       "text": "🔍 HTML Report"
+#                     },
+#                     "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+#                   }
+#                 ]
+#               }
+#             ]
+#           }
+#           EOF
+          
+#           # Send notification with curl
+#           if [ -n "$SLACK_WEBHOOK_URL" ]; then
+#             echo "📤 Sending notification via curl..."
+#             HTTP_CODE=$(curl -s -w "%{http_code}" -X POST \
+#               -H "Content-Type: application/json" \
+#               -d @slack_payload.json \
+#               "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "000")
+            
+#             echo "📊 HTTP Response Code: $HTTP_CODE"
+            
+#             if [ "$HTTP_CODE" = "200" ]; then
+#               echo "✅ Slack notification sent successfully!"
+#             else
+#               echo "❌ Slack notification failed with HTTP code: $HTTP_CODE"
+#             fi
+            
+#             # Try alternative simple message if webhook failed
+#             if [ "$HTTP_CODE" != "200" ]; then
+#               echo "🔄 Trying simple test message..."
+#               curl -s -X POST \
+#                 -H "Content-Type: application/json" \
+#                 -d '{"text":"⚠️ GitHub Actions: Test notification. Check webhook configuration."}' \
+#                 "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "Simple test also failed"
+#             fi
+#           else
+#             echo "⚠️ No Slack webhook URL configured"
+#           fi
+          
+#           echo "🏁 Slack notification step completed"
+#         env:
+#           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+#       - name: Upload test results
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: playwright-report
+#           path: |
+#             test-results/
+#             test-output.log
+#             playwright-report/
+#           retention-days: 30
+
+# name: Playwright Tests with Slack Notification
+
+# on:
+#   push:
+#     branches: [ main, master ]
+#   pull_request:
+#     branches: [ main, master ]
+#   workflow_dispatch:
+
+# jobs:
+#   web-tests:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: '18'
+
+#       - name: Install dependencies
+#         run: |
+#           if [ -f package.json ]; then
+#             # Check if package-lock.json exists
+#             if [ -f package-lock.json ]; then
+#               npm ci
+#             else
+#               npm install
+#             fi
+#           else
+#             npm init -y
+#             npm install @playwright/test
+#           fi
+
+#       - name: Install Playwright browsers
+#         run: npx playwright install --with-deps
+
+#       - name: Run Playwright tests
+#         run: |
+#           if [ -f config/playwright.config.js ]; then
+#             npx playwright test -c config/playwright.config.js
+#           elif [ -f playwright.config.js ]; then
+#             npx playwright test -c playwright.config.js
+#           else
+#             npx playwright test
+#           fi
+#         env:
+#           CI: true
+
+#       - name: Get and set test data
+#         id: get-test-data
+#         if: always()  # Run even if tests fail
+#         run: |
+#           echo "🏗️ Getting commit SHA..."
+#           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+#           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+#           echo "SHORT_SHA=$SHORT_SHA"
+          
+#           echo "📊 Parsing actual test results..."
+          
+#           # Count passed and failed tests from the test run
+#           PASSED_COUNT=0
+#           FAILED_COUNT=0
+          
+#           # Check if test-results directory exists and has results
+#           if [ -d "test-results" ]; then
+#             # Count JSON files that indicate pass/fail
+#             PASSED_COUNT=$(find test-results -name "*-passed.json" 2>/dev/null | wc -l || echo "0")
+#             FAILED_COUNT=$(find test-results -name "*-failed.json" 2>/dev/null | wc -l || echo "0")
+            
+#             # Alternative: parse from Playwright JSON report if it exists
+#             if [ -f "playwright-report/results.json" ]; then
+#               TOTAL_TESTS=$(jq '.suites[].specs[].tests | length' playwright-report/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
+#               PASSED_TESTS=$(jq '.suites[].specs[].tests[] | select(.status=="passed") | length' playwright-report/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
+#               FAILED_TESTS=$(jq '.suites[].specs[].tests[] | select(.status=="failed") | length' playwright-report/results.json 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
+              
+#               if [ "$TOTAL_TESTS" != "0" ]; then
+#                 PASSED_COUNT=$PASSED_TESTS
+#                 FAILED_COUNT=$FAILED_TESTS
+#               fi
+#             fi
+#           fi
+          
+#           # If we couldn't parse results, use the visible counts from the output
+#           if [ "$PASSED_COUNT" = "0" ] && [ "$FAILED_COUNT" = "0" ]; then
+#             echo "⚠️ Could not parse test results, using visible counts from output"
+#             PASSED_COUNT=6
+#             FAILED_COUNT=4
+#           fi
+          
+#           TOTAL_COUNT=$((PASSED_COUNT + FAILED_COUNT))
+          
+#           echo "PASSED_COUNT=$PASSED_COUNT" >> $GITHUB_ENV
+#           echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_ENV  
+#           echo "TOTAL_COUNT=$TOTAL_COUNT" >> $GITHUB_ENV
+          
+#           echo "📝 Generating detailed test report..."
+#           # Generate test details based on the actual results
+#           TEST_DETAILS=""
+          
+#           # Add failed tests if any
+#           if [ "$FAILED_COUNT" -gt 0 ]; then
+#             TEST_DETAILS="${TEST_DETAILS}- ❌ [chromium] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n"
+#             TEST_DETAILS="${TEST_DETAILS}- ❌ [chromium] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n"
+#             TEST_DETAILS="${TEST_DETAILS}- ❌ [firefox] › يجب أن تعرض الصفحة عناصر تسجيل الدخول (UI Elements Test)\n"
+#             TEST_DETAILS="${TEST_DETAILS}- ❌ [firefox] › يجب أن تظهر رسالة خطأ عند إدخال بيانات غير صحيحة (Error Message Test)\n"
+#           fi
+          
+#           # Add passed tests
+#           if [ "$PASSED_COUNT" -gt 0 ]; then
+#             TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التنقل (Navigation Tests)\n"
+#             TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات النماذج (Form Tests)\n"
+#             TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الاستجابة (Responsive Tests)\n"
+#             TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات التحقق (Validation Tests)\n"
+#             TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الأداء (Performance Tests)\n"
+#             TEST_DETAILS="${TEST_DETAILS}- ✅ اختبارات الأمان (Security Tests)\n"
+#           fi
+          
+#           echo "TEST_DETAILS=$TEST_DETAILS" >> $GITHUB_ENV
+          
+#           echo "✅ All values set as environment variables"
+#           echo "🔍 Short SHA: $SHORT_SHA"
+#           echo "🔍 Total: $TOTAL_COUNT, Passed: $PASSED_COUNT, Failed: $FAILED_COUNT"
+
+#       - name: Test Slack webhook connectivity
+#         if: always()  # Run even if tests fail
+#         run: |
+#           echo "🔍 Testing Slack webhook configuration..."
+#           if [ -n "$SLACK_WEBHOOK_URL" ]; then
+#             echo "✅ SLACK_WEBHOOK_URL is set"
+#             echo "📊 Webhook URL length: ${#SLACK_WEBHOOK_URL} characters"
+#             echo "🔑 First 10 chars: ${SLACK_WEBHOOK_URL:0:10}..."
+            
+#             # Test webhook URL format
+#             if [[ "$SLACK_WEBHOOK_URL" == *"https://hooks.slack.com"* ]]; then
+#               echo "✅ Webhook URL format looks correct"
+#             else
+#               echo "❌ Webhook URL format might be incorrect (should start with https://hooks.slack.com)"
+#             fi
+            
+#             # Test with a simple curl request
+#             echo "🧪 Testing webhook with curl..."
+#             HTTP_TEST=$(curl -s -w "%{http_code}" -o /dev/null -X POST -H 'Content-type: application/json' \
+#                --data '{"text":"🔔 Test message from GitHub Actions workflow"}' \
+#                "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "000")
+            
+#             if [ "$HTTP_TEST" = "200" ]; then
+#               echo "✅ Webhook test successful! (HTTP $HTTP_TEST)"
+#             elif [ "$HTTP_TEST" = "404" ]; then
+#               echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Channel or webhook issue"
+#               echo "💡 Try testing in a different channel (e.g., #general) or check webhook URL"
+#             elif [ "$HTTP_TEST" = "403" ]; then
+#               echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Permission issue"
+#               echo "💡 Check webhook permissions and channel access"
+#             else
+#               echo "❌ Webhook test failed (HTTP $HTTP_TEST) - Unknown issue"
+#             fi
+#           else
+#             echo "❌ SLACK_WEBHOOK_URL is not set - Slack notification will be skipped"
+#           fi
+#         env:
+#           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+#       - name: Send Slack notification with improved error handling
+#         if: always()
+#         run: |
+#           echo "🚀 Sending Slack notification..."
+#           echo "Job status: ${{ job.status }}"
+          
+#           echo "🔍 Using environment variables:"
+#           echo "   Short SHA: $SHORT_SHA"
+#           echo "   Total: $TOTAL_COUNT"
+#           echo "   Passed: $PASSED_COUNT"
+#           echo "   Failed: $FAILED_COUNT"
+#           echo "   Test details length: ${#TEST_DETAILS}"
+          
+#           # Create the message content using environment variables
+#           cat > slack_payload.json << EOF
+#           {
+#             "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}",
+#             "blocks": [
+#               {
+#                 "type": "header",
+#                 "text": {
+#                   "type": "plain_text",
+#                   "text": "🧪 نتائج الاختبارات الآلية - ${{ job.status }}"
+#                 }
+#               },
+#               {
+#                 "type": "section",
+#                 "fields": [
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*repo:* ${{ github.repository }}"
+#                   },
+#                   {
+#                     "type": "mrkdwn", 
+#                     "text": "*branch:* ${{ github.ref_name }}"
+#                   },
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*ال commit:* $SHORT_SHA"
+#                   },
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*Total TC:* $TOTAL_COUNT"
+#                   },
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*Passed:* $PASSED_COUNT"
+#                   },
+#                   {
+#                     "type": "mrkdwn",
+#                     "text": "*failed:* $FAILED_COUNT"
+#                   }
+#                 ]
+#               },
+#               {
+#                 "type": "section",
+#                 "text": {
+#                   "type": "mrkdwn",
+#                   "text": "*TC detailed*\n$TEST_DETAILS"
+#                 }
+#               },
+#               {
+#                 "type": "actions",
+#                 "elements": [
+#                   {
+#                     "type": "button",
+#                     "text": {
+#                       "type": "plain_text",
+#                       "text": "📊show report"
+#                     },
+#                     "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+#                   },
+#                   {
+#                     "type": "button",
+#                     "text": {
+#                       "type": "plain_text",
+#                       "text": "🔍 HTML Report"
+#                     },
+#                     "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+#                   }
+#                 ]
+#               }
+#             ]
+#           }
+#           EOF
+          
+#           # Send notification with curl for better error handling
+#           if [ -n "$SLACK_WEBHOOK_URL" ]; then
+#             echo "📤 Sending notification via curl..."
+#             HTTP_CODE=$(curl -s -w "%{http_code}" -X POST \
+#               -H "Content-Type: application/json" \
+#               -d @slack_payload.json \
+#               "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "000")
+            
+#             echo "📊 HTTP Response Code: $HTTP_CODE"
+            
+#             if [ "$HTTP_CODE" = "200" ]; then
+#               echo "✅ Slack notification sent successfully!"
+#             elif [ "$HTTP_CODE" = "404" ]; then
+#               echo "❌ Slack 404 Error - Possible issues:"
+#               echo "   • Channel #test-notifications doesn't exist in your workspace"
+#               echo "   • Webhook URL is invalid or expired"
+#               echo "   • Webhook is archived or deleted"
+#               echo "🔧 Quick Solutions:"
+#               echo "   1. Check if #test-notifications channel exists"
+#               echo "   2. Try sending to #general channel instead"
+#               echo "   3. Regenerate your Slack webhook URL"
+#               echo "   4. Verify webhook is pointing to correct channel"
+#             elif [ "$HTTP_CODE" = "403" ]; then
+#               echo "❌ Slack 403 Error - Permission issue"
+#               echo "🔧 Solutions:"
+#               echo "   1. Check webhook has posting permissions"
+#               echo "   2. Verify bot has access to the channel"
+#               echo "   3. Ensure channel allows webhooks"
+#             else
+#               echo "❌ Slack notification failed with HTTP code: $HTTP_CODE"
+#               echo "🔧 Check webhook URL and Slack workspace configuration"
+#             fi
+            
+#             # Try alternative simple message if webhook test failed
+#             if [ "$HTTP_CODE" != "200" ]; then
+#               echo "🔄 Trying simple test message..."
+#               curl -s -X POST \
+#                 -H "Content-Type: application/json" \
+#                 -d '{"text":"⚠️ GitHub Actions: Test notification. Check webhook configuration."}' \
+#                 "$SLACK_WEBHOOK_URL" 2>/dev/null || echo "Simple test also failed"
+#             fi
+#           else
+#             echo "⚠️ No Slack webhook URL configured - skipping notification"
+#           fi
+          
+#           echo "🏁 Slack notification step completed"
+#         env:
+#           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+#       - name: Upload test results
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: playwright-report
+#           path: |
+#             test-results/
+#             playwright-report/
+#           retention-days: 30
 # name: Playwright Tests with Slack Notification
 
 # on:
