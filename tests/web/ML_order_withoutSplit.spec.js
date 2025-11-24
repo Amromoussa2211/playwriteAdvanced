@@ -2,7 +2,7 @@
 import { test, expect } from "@playwright/test";
 import Jimp from "jimp-compact";
 import QrCode from "qrcode-reader";
-
+//npx playwright test tests/web/ML_order_withoutSplit.spec.js
 // -------- DECODE QR FUNCTION --------
 async function decodeQR(buffer) {
   const img = await Jimp.read(buffer);
