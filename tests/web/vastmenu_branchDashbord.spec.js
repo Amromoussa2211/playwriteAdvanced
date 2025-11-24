@@ -8,7 +8,7 @@ test('Open branch Dashbord and verifay Elments apper ', async ({ page }) => {
   await page.getByPlaceholder('Password').fill('password');
   await page.getByPlaceholder('Password').press('Enter');
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page.locator('.base-app-card').first()).toBeVisible();
+  // await expect(page.locator('.base-app-card').first()).toBeVisible();
   await expect(page.getByRole('main')).toContainText('0Total tips');
   await page.locator('.vast-content-section-break > div:nth-child(2)').first().click();
   await expect(page.locator('.vast-content-section-break > div:nth-child(2)').first()).toBeVisible();

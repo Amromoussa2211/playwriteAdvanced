@@ -160,22 +160,7 @@ await page.locator('.mdi-close-circle-outline').click();
   await page.locator('#switch-40').check();
   await page1.goto('https://pwa-dev.vastmenu.com/');
 //////////////////
-const closeIcon = page.locator('i.mdi-close-circle-outline');
-if (await closeIcon.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await closeIcon.click();
-    await page.waitForTimeout(500);
-}
 
-const resettodefult = page.locator('#switch-66');
-if (await resettodefult.isVisible()) {
-    await resettodefult.click();
-    
-    const confirmBtn = page.locator('button.swal2-confirm.swal2-styled:has-text("Confirm")');
-    if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await confirmBtn.click();
-        await page.waitForTimeout(1000);
-    }
-}
 
 });
 
