@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { fakerAR, fakerEN } from '@faker-js/faker';
 //npx playwright test ./tests/web/Vastmenu_admin_Additem.spec.js --headed
-test('Add new product with automated data', async ({ page }) => {
+test('Add new Item with automated data', async ({ page }) => {
   // Configure timeout and wait for network idle
   test.setTimeout(60000);
   

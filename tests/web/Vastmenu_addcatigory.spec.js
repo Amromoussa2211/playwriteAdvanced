@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('Create category with robust image upload and dynamic waits', async ({ page }) => {
+test('Create category of item with robust image upload and dynamic waits', async ({ page }) => {
   // Set longer timeout for the entire test
   test.setTimeout(120000);
 

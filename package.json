@@ -30,7 +30,10 @@
     "appium": "^2.2.1",
     "axios": "^1.6.2",
     "dotenv": "^16.3.1",
+    "jimp": "^1.6.0",
+    "jimp-compact": "^0.16.1-2",
     "nodemailer": "^6.9.7",
+    "qrcode-reader": "^1.0.4",
     "webdriverio": "^8.24.0"
   },
   "devDependencies": {
