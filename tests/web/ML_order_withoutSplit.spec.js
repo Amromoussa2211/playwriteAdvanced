@@ -28,6 +28,17 @@ test("scan QR → menu list makeorderwitout split", async ({ page, context }) =>
   // 2) Go to tables
   await page.getByRole("link", { name: "Tables" }).click();
   await page.waitForLoadState("networkidle");
+   const switchTrack = page.locator('.v-switch__track');
+try {
+  await switchTrack.waitFor({ state: 'visible', timeout: 5000 });
+  await switchTrack.click({ force: true });
+  console.log('✓ Switch track clicked');
+  
+  // Wait a moment for the state to change
+  await page.waitForTimeout(1000);
+} catch (error) {
+  console.log('Switch track not found or not visible, continuing with test...');
+}
 
   // 3) Click the icon that opens the QR modal
   const qrButton = page.locator(
