@@ -199,7 +199,7 @@ try {
   await page.waitForTimeout(1000);
 } catch (error) {
   console.log('Switch track not found or not visible, continuing with test...');
-}
+} 
 
 });
 
