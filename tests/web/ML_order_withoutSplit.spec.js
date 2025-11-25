@@ -33,7 +33,7 @@ try {
   await switchTrack.waitFor({ state: 'visible', timeout: 5000 });
   await switchTrack.click({ force: true });
   console.log('✓ Switch track clicked');
-  
+  await page.getByRole('button', { name: 'Confirm' }).click();
   // Wait a moment for the state to change
   await page.waitForTimeout(1000);
 } catch (error) {
