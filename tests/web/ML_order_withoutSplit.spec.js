@@ -28,7 +28,7 @@ test("scan QR → menu list makeorderwitout split", async ({ page, context }) =>
   // 2) Go to tables
   await page.getByRole("link", { name: "Tables" }).click();
   await page.waitForLoadState("networkidle");
-   const switchTrack = page.locator('.v-switch__track');
+  const switchTrack = page.locator('.v-switch__track');
 try {
   await switchTrack.waitFor({ state: 'visible', timeout: 5000 });
   await switchTrack.click({ force: true });
