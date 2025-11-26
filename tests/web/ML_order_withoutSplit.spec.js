@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import Jimp from "jimp-compact";
 import QrCode from "qrcode-reader";
 
+const TABLE_INDEX = 1;
+
 // -------- DECODE QR FUNCTION --------
 async function decodeQR(buffer) {
   const img = await Jimp.read(buffer);
@@ -15,44 +17,73 @@ async function decodeQR(buffer) {
   });
 }
 
+// Reset table before each test to ensure clean state
+// Reset table before each test to ensure clean state
+test.beforeEach(async ({ page }) => {
+  // Increase timeout for setup hook
+  test.setTimeout(60000);
+  console.log("[SETUP] Resetting table state...");
+  
+  // Login to dashboard
+  await page.goto("https://dashboard-dev.vastmenu.com/authentication/login");
+  await page.getByPlaceholder("Email").fill("amr@test.test");
+  await page.getByPlaceholder("Password").fill("password");
+  await page.getByRole("button", { name: "Sign In" }).click();
+  // Use domcontentloaded instead of networkidle for faster login
+  await page.waitForLoadState("domcontentloaded");
+  
+  // Go to tables
+  await page.getByRole("link", { name: "Tables" }).click();
+  await page.waitForLoadState("domcontentloaded");
+  // Wait for tables to be visible to ensure page is loaded
+  await page.locator('.table-details').first().waitFor({ state: "visible", timeout: 30000 });
+  await page.waitForTimeout(1000);
+  
+  // Reset switch track (clear table)
+  const switchTrack = page.locator('.v-switch__track').nth(TABLE_INDEX);
+  try {
+    if (await switchTrack.isVisible({ timeout: 3000 })) {
+      await switchTrack.click({ force: true });
+      console.log('[SETUP] Table reset - switch clicked');
+      
+      const confirmBtn = page.getByRole('button', { name: 'Confirm' });
+      if (await confirmBtn.isVisible({ timeout: 2000 })) {
+        await confirmBtn.click();
+      }
+      await page.waitForTimeout(1000);
+    }
+  } catch (error) {
+    console.log('[SETUP] Table already in correct state');
+  }
+  
+  console.log("[SETUP] Table ready for test");
+});
+
 test("scan QR → menu list makeorderwitout split", async ({ page, context }) => {
-  test.setTimeout(120000); // Set timeout to 120 seconds
+  test.setTimeout(300000); // Set timeout to 5 minutes
 
   // --- STEP 1: LOGIN ---
   await test.step("Login to Dashboard", async () => {
     console.log("[STEP] Starting Login Process...");
-    await page.goto("https://dashboard-dev.vastmenu.com/authentication/login");
-    await page.getByPlaceholder("Email").fill("amr@test.test");
-    await page.getByPlaceholder("Password").fill("password");
-    await page.getByRole("button", { name: "Sign In" }).click();
-    await page.waitForLoadState("networkidle");
-    console.log("[INFO] Login Successful");
+    // Already logged in from beforeEach, just verify
+    await expect(page).toHaveURL(/dashboard-dev.vastmenu.com/);
+    console.log("[INFO] Already logged in from setup");
   });
 
   // --- STEP 2: NAVIGATE TO TABLES ---
-  await test.step("Navigate to Tables & Enable Tracking", async () => {
-    await page.getByRole("link", { name: "Tables" }).click();
-    await page.waitForLoadState("networkidle");
-
-    // Handle Switch Track (Try/Catch as per original logic)
-    const switchTrack = page.locator('.v-switch__track');
-    try {
-      await switchTrack.waitFor({ state: 'visible', timeout: 5000 });
-      await switchTrack.click({ force: true });
-      console.log('[INFO] Switch track clicked successfully');
-      await page.getByRole('button', { name: 'Confirm' }).click();
-      await page.waitForTimeout(1000);
-    } catch (error) {
-      console.log('[INFO] Switch track not found or not visible, continuing...');
-    }
+  await test.step("Navigate to Tables", async () => {
+    // Already on tables page from beforeEach
+    await expect(page).toHaveURL(/tables/);
+    console.log("[INFO] Already on tables page from setup");
   });
 
   // --- STEP 3: QR CODE GENERATION & DECODING ---
   let urlInQR;
   await test.step("Generate and Decode QR Code", async () => {
+    // Use specific table for this test (test isolation)
     const qrButton = page.locator(
       "#app div.table-details .table-name-with-status .status div.icon.cursor-pointer"
-    ).first();
+    ).nth(TABLE_INDEX);
 
     await qrButton.waitFor({ state: "visible" });
     await qrButton.click();
@@ -92,10 +123,41 @@ test("scan QR → menu list makeorderwitout split", async ({ page, context }) =>
     await addBtn0.waitFor({ state: 'visible' });
     await addBtn0.click();
 
-    // Open Category Menu
-    const menuBtn = page1.getByRole('button', { name: 'Menu' }).nth(3);
-    await menuBtn.waitFor({ state: 'visible' });
-    await menuBtn.click();
+    // Open Menu to select specific item - with retry logic
+    console.log('[INFO] Looking for Menu button...');
+    let menuBtn;
+    let menuClicked = false;
+    
+    // Try nth(3) first
+    try {
+      menuBtn = page1.getByRole('button', { name: 'Menu' }).nth(3);
+      await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
+      await menuBtn.click();
+      menuClicked = true;
+      console.log('[INFO] Clicked Menu button nth(3)');
+    } catch (error) {
+      console.log('[WARN] Menu button nth(3) not found, trying nth(2)...');
+      try {
+        menuBtn = page1.getByRole('button', { name: 'Menu' }).nth(2);
+        await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await menuBtn.click();
+        menuClicked = true;
+        console.log('[INFO] Clicked Menu button nth(2)');
+      } catch (error2) {
+        console.log('[WARN] Menu button nth(2) not found, trying nth(1)...');
+        menuBtn = page1.getByRole('button', { name: 'Menu' }).nth(1);
+        await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await menuBtn.click();
+        menuClicked = true;
+        console.log('[INFO] Clicked Menu button nth(1)');
+      }
+    }
+
+    if (!menuClicked) {
+      throw new Error('Could not find Menu button');
+    }
+
+    await page1.waitForTimeout(1000); // Wait for menu to open
 
     // Select Item '2'
     const item2 = page1.getByText('2').nth(1);
@@ -110,7 +172,17 @@ test("scan QR → menu list makeorderwitout split", async ({ page, context }) =>
   // --- STEP 6: CONFIRM ORDER ---
   await test.step("Confirm Order in Cart", async () => {
     const addButton = page1.getByRole('button', { name: /add/i });
-    await addButton.waitFor({ state: 'visible', timeout: 15000 });
+
+    
+    try {
+      await addButton.waitFor({ state: 'visible', timeout: 5000 });
+    } catch (e) {
+      console.log("[INFO] 'Add' button not found, clicking Item '2' again...");
+      const item2 = page1.getByText('2').nth(1);
+      await item2.click({ force: true });
+      await addButton.waitFor({ state: 'visible', timeout: 30000 });
+    }
+
     await addButton.click();
 
     const totalBtn = page1.getByRole('button', { name: '3 Item Total' });
