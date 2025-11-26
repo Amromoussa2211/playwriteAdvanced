@@ -1,8 +1,7 @@
-
 import { test, expect } from "@playwright/test";
 import Jimp from "jimp-compact";
 import QrCode from "qrcode-reader";
-//npx playwright test tests/web/ML_order_withoutSplit.spec.js
+
 // -------- DECODE QR FUNCTION --------
 async function decodeQR(buffer) {
   const img = await Jimp.read(buffer);
@@ -17,163 +16,347 @@ async function decodeQR(buffer) {
 }
 
 test("scan QR → menu list makeorderwitout split", async ({ page, context }) => {
-  test.setTimeout(120000); // Increase timeout to 120 seconds
-  // 1) LOGIN
-  await page.goto("https://dashboard-dev.vastmenu.com/authentication/login");
-  await page.getByPlaceholder("Email").fill("amr@test.test");
-  await page.getByPlaceholder("Password").fill("password");
-  await page.getByRole("button", { name: "Sign In" }).click();
-  await page.waitForLoadState("networkidle");
+  test.setTimeout(120000); // Set timeout to 120 seconds
 
-  // 2) Go to tables
-  await page.getByRole("link", { name: "Tables" }).click();
-  await page.waitForLoadState("networkidle");
-  const switchTrack = page.locator('.v-switch__track');
-try {
-  await switchTrack.waitFor({ state: 'visible', timeout: 5000 });
-  await switchTrack.click({ force: true });
-  console.log('✓ Switch track clicked');
-  await page.getByRole('button', { name: 'Confirm' }).click();
-  // Wait a moment for the state to change
-  await page.waitForTimeout(1000);
-} catch (error) {
-  console.log('Switch track not found or not visible, continuing with test...');
-}
+  // --- STEP 1: LOGIN ---
+  await test.step("Login to Dashboard", async () => {
+    console.log("[STEP] Starting Login Process...");
+    await page.goto("https://dashboard-dev.vastmenu.com/authentication/login");
+    await page.getByPlaceholder("Email").fill("amr@test.test");
+    await page.getByPlaceholder("Password").fill("password");
+    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.waitForLoadState("networkidle");
+    console.log("[INFO] Login Successful");
+  });
 
-  // 3) Click the icon that opens the QR modal
-  const qrButton = page.locator(
-    "#app div.table-details .table-name-with-status .status div.icon.cursor-pointer"
-  ).first();
+  // --- STEP 2: NAVIGATE TO TABLES ---
+  await test.step("Navigate to Tables & Enable Tracking", async () => {
+    await page.getByRole("link", { name: "Tables" }).click();
+    await page.waitForLoadState("networkidle");
 
-  await qrButton.waitFor({ state: "visible" });
-  await qrButton.click();
+    // Handle Switch Track (Try/Catch as per original logic)
+    const switchTrack = page.locator('.v-switch__track');
+    try {
+      await switchTrack.waitFor({ state: 'visible', timeout: 5000 });
+      await switchTrack.click({ force: true });
+      console.log('[INFO] Switch track clicked successfully');
+      await page.getByRole('button', { name: 'Confirm' }).click();
+      await page.waitForTimeout(1000);
+    } catch (error) {
+      console.log('[INFO] Switch track not found or not visible, continuing...');
+    }
+  });
 
-  // 4) Wait for QR Image to appear inside the modal
-  const qrImg = page.locator('img.v-img__img[src*="qrcode"]');
+  // --- STEP 3: QR CODE GENERATION & DECODING ---
+  let urlInQR;
+  await test.step("Generate and Decode QR Code", async () => {
+    const qrButton = page.locator(
+      "#app div.table-details .table-name-with-status .status div.icon.cursor-pointer"
+    ).first();
 
-  await expect(qrImg).toBeVisible();
-  await qrImg.waitFor({ state: "visible" });
+    await qrButton.waitFor({ state: "visible" });
+    await qrButton.click();
 
-  // 5) Screenshot ONLY the QR code
-  const qrBuffer = await qrImg.screenshot();
+    const qrImg = page.locator('img.v-img__img[src*="qrcode"]');
+    await expect(qrImg).toBeVisible();
+    await qrImg.waitFor({ state: "visible" });
 
-  // 6) Decode QR → get URL
-  const urlInQR = await decodeQR(qrBuffer);
-  console.log("🔗 QR URL = ", urlInQR);
+    // Screenshot and Decode
+    const qrBuffer = await qrImg.screenshot();
+    urlInQR = await decodeQR(qrBuffer);
+    console.log(`[INFO] Decoded QR URL: ${urlInQR}`);
+  });
 
-  // 7) Open the decoded URL in a new tab
+  // --- STEP 4: OPEN MOBILE MENU (NEW TAB) ---
   const newPage = await context.newPage();
-  await newPage.goto(urlInQR);
-  await newPage.waitForLoadState("domcontentloaded");
+  await test.step("Open Menu in New Tab", async () => {
+    await newPage.goto(urlInQR);
+    await newPage.waitForLoadState("domcontentloaded");
+    await expect(newPage).toBeTruthy();
+    console.log("[INFO] Mobile Menu Loaded");
+  });
 
-  // 8) Verify page is loaded
-  await expect(newPage).toBeTruthy();
-  const page1 = newPage;
+  const page1 = newPage; // Alias for the mobile page
 
-  // --- ORDERING FLOW ---
-  
-  // Wait for the menu items to be visible
-  await page1.waitForLoadState("networkidle");
-  
-  // Add items to cart
-  // Using more robust waits before clicking
-  const addBtn1 = page1.getByText('add').nth(1);
-  await addBtn1.waitFor({ state: 'visible' });
-  await addBtn1.click();
+  // --- STEP 5: ADD ITEMS TO CART ---
+  await test.step("Add Items to Cart", async () => {
+    await page1.waitForLoadState("networkidle");
+    
+    // Add Item 1
+    const addBtn1 = page1.getByText('add').nth(1);
+    await addBtn1.waitFor({ state: 'visible' });
+    await addBtn1.click();
 
-  const addBtn0 = page1.getByText('add').first();
-  await addBtn0.waitFor({ state: 'visible' });
-  await addBtn0.click();
+    // Add Item 0
+    const addBtn0 = page1.getByText('add').first();
+    await addBtn0.waitFor({ state: 'visible' });
+    await addBtn0.click();
 
-  // Open Menu/Category
-  // Assuming 'Menu' button opens a category or options
-  const menuBtn = page1.getByRole('button', { name: 'Menu' }).nth(3);
-  await menuBtn.waitFor({ state: 'visible' });
-  await menuBtn.click();
+    // Open Category Menu
+    const menuBtn = page1.getByRole('button', { name: 'Menu' }).nth(3);
+    await menuBtn.waitFor({ state: 'visible' });
+    await menuBtn.click();
 
-  // Select item '2'
-  const item2 = page1.getByText('2').nth(1);
-  await item2.waitFor({ state: 'visible' });
-  await item2.click();
+    // Select Item '2'
+    const item2 = page1.getByText('2').nth(1);
+    await item2.waitFor({ state: 'visible' });
+    await item2.click();
 
-  // Verify '2' is added/visible in the app container
-  await expect(page1.locator('#q-app')).toContainText('2');
+    // Verify Item '2' exists
+    await expect(page1.locator('#q-app')).toContainText('2');
+    console.log("[INFO] Items added to cart successfully");
+  });
 
-  // Click 'Add' button - this was failing
-  // Try case-insensitive and wait longer
-  const addButton = page1.getByRole('button', { name: /add/i }); 
-  // If button role fails, it might be a div with text, but let's stick to button first with regex
-  await addButton.waitFor({ state: 'visible', timeout: 15000 });
-  await addButton.click();
+  // --- STEP 6: CONFIRM ORDER ---
+  await test.step("Confirm Order in Cart", async () => {
+    const addButton = page1.getByRole('button', { name: /add/i });
+    await addButton.waitFor({ state: 'visible', timeout: 15000 });
+    await addButton.click();
 
-  // Go to Total/Cart
-  const totalBtn = page1.getByRole('button', { name: '3 Item Total' });
-  await totalBtn.waitFor({ state: 'visible' });
-  await totalBtn.click();
+    const totalBtn = page1.getByRole('button', { name: '3 Item Total' });
+    await totalBtn.waitFor({ state: 'visible' });
+    await totalBtn.click();
 
-  // Select Tip (10%)
-  // await page1.locator('div').filter({ hasText: /^10%$/ }).click();
+    await page1.getByRole('button', { name: 'Confirm' }).click();
+    console.log("[INFO] Order Confirmed");
+  });
 
-  // Confirm Order
-  await page1.getByRole('button', { name: 'Confirm' }).click();
+  // --- STEP 7: PAYMENT PROCESS ---
+  await test.step("Process Card Payment", async () => {
+    await page1.locator('p[class*="text-fontExtraBold"][class*="white"]:has-text("Full pay")').click();  
+    
+    const payCardBtn = page1.getByRole('button', { name: 'Pay Card' });
+    await payCardBtn.waitFor({ state: 'visible' });
+    await payCardBtn.click();
 
+    // Iframe interaction
+    const iframeContainer = page1.locator('.card-container');
+    await iframeContainer.waitFor({ state: 'visible', timeout: 30000 });
 
+    const iframeElement = page1.locator('iframe[name="tapFrame"]');
+    await iframeElement.waitFor({ state: 'visible', timeout: 30000 });
 
-  // Pay
-await page1.locator('p[class*="text-fontExtraBold"][class*="white"]:has-text("Full pay")').click();  
-  const payCardBtn = page1.getByRole('button', { name: 'Pay Card' });
-  await payCardBtn.waitFor({ state: 'visible' });
-  await payCardBtn.click();
+    const frame = page1.locator('iframe[name="tapFrame"]').contentFrame();
+    
+    await frame.locator('header').click();
+    await frame.getByTestId('CreditCard').fill('5123450000000008\t');
+    await frame.getByRole('textbox', { name: 'MM/YY' }).fill('01/39');
+    await frame.getByRole('textbox', { name: 'CVV' }).fill('100');
+    await frame.getByRole('textbox', { name: 'Card Holder Name (min. 3' }).fill('APPROVe');
+    
+    // Submit Payment
+    await page1.locator('[id^="q-portal--dialog"]').getByRole('button', { name: 'Pay', exact: true }).click();
+    console.log("[INFO] Card details entered and Pay clicked");
+  });
 
+  // --- STEP 8: 3D SECURE & SUCCESS ---
+  await test.step("Handle 3D Secure and Verify Success", async () => {
+    await page1.waitForURL(/authenticate\.alpha\.tap\.company/, { timeout: 20000 });
+    
+    const challengeFrame = page1.locator('iframe[name="challengeFrame"]').contentFrame();
+    await challengeFrame.getByRole('button', { name: 'Submit' }).click();
+    
+    await page1.waitForURL(/payment-success/, { timeout: 20000 });
+    console.log("[INFO] Payment Success URL reached");
 
-  // Fill Payment Details (in iframe)
-  // 1. Wait for the container of the iframe (bottom sheet)
-  const iframeContainer = page1.locator('.card-container');
-  await iframeContainer.waitFor({ state: 'visible', timeout: 30000 });
+    // Close Dialog and Return Home
+    await page1.locator('#q-portal--dialog--1').getByRole('button', { name: 'Home' }).click();
+  });
 
-  // 2. Wait for the iframe element itself
-  const iframeElement = page1.locator('iframe[name="tapFrame"]');
-  await iframeElement.waitFor({ state: 'visible', timeout: 30000 });
+  // --- STEP 9: VALIDATE ON DASHBOARD ---
+  await test.step("Validate Payment on Dashboard and Reset", async () => {
+    await page.locator('.mdi-close-circle-outline').click();
+    
+    // Check PWA history
+    await page1.goto('https://pwa-dev.vastmenu.com/');
+    await page1.getByRole('button', { name: '4 Item Total' }).click();
+    
+    await expect(page1.locator('#q-app')).toContainText('Payment success');
+    await expect(page1.locator('#q-app')).toContainText('Download Payment Receipt');
+    console.log("[SUCCESS] Payment receipt verified");
 
-  // 3. Access the frame
-  const tapFrameLocator = page1.locator('iframe[name="tapFrame"]');
-  const tapFrameHandle = await tapFrameLocator.elementHandle();
-
-    await page1.locator('iframe[name="tapFrame"]').contentFrame().locator('header').click();
-  await page1.locator('iframe[name="tapFrame"]').contentFrame().getByTestId('CreditCard').fill('5123450000000008\t');
-  await page1.locator('iframe[name="tapFrame"]').contentFrame().getByRole('textbox', { name: 'MM/YY' }).fill('01/39');
-  await page1.locator('iframe[name="tapFrame"]').contentFrame().getByRole('textbox', { name: 'CVV' }).fill('100');
-  await page1.locator('iframe[name="tapFrame"]').contentFrame().getByRole('textbox', { name: 'Card Holder Name (min. 3' }).fill('APPROVe');
-  
-  // Click Pay button inside the dialog (dialog ID may vary)
-  await page1.locator('[id^="q-portal--dialog"]').getByRole('button', { name: 'Pay', exact: true }).click();
-  
-  // Wait for 3D Secure redirect (dynamic URL)
-  await page1.waitForURL(/authenticate\.alpha\.tap\.company/, { timeout: 20000 });
-  
-  // Submit 3D Secure challenge
-  const challengeFrame = page1.locator('iframe[name="challengeFrame"]').contentFrame();
-  await challengeFrame.getByRole('button', { name: 'Submit' }).click();
-  
-  // Wait for payment success redirect (dynamic URL)
-  await page1.waitForURL(/payment-success/, { timeout: 20000 });
-
-  await page1.locator('#q-portal--dialog--1').getByRole('button', { name: 'Home' }).click();
-  // await page1.pause();
-  ///////////////////
-await page.locator('.mdi-close-circle-outline').click();
-  await page1.goto('https://pwa-dev.vastmenu.com/');
-  await page1.getByRole('button', { name: '4 Item Total' }).click();
-  
-  await expect(page1.locator('#q-app')).toContainText('Payment success');
-  await expect(page1.locator('#q-app')).toContainText('Download Payment Receipt');
-  await page.goto('https://dashboard-dev.vastmenu.com/branch-tables');
-  await page.locator('#switch-40').check();
-  await page1.goto('https://pwa-dev.vastmenu.com/');
-//////////////////
-
-
+    // Reset Table Status
+    await page.goto('https://dashboard-dev.vastmenu.com/branch-tables');
+    await page.locator('#switch-40').check();
+    await page1.goto('https://pwa-dev.vastmenu.com/');
+  });
 });
+///worked cleary
+// import { test, expect } from "@playwright/test";
+// import Jimp from "jimp-compact";
+// import QrCode from "qrcode-reader";
+// //npx playwright test tests/web/ML_order_withoutSplit.spec.js
+// // -------- DECODE QR FUNCTION --------
+// async function decodeQR(buffer) {
+//   const img = await Jimp.read(buffer);
+//   return new Promise((resolve, reject) => {
+//     const qr = new QrCode();
+//     qr.callback = (err, value) => {
+//       if (err) reject(err);
+//       else resolve(value.result);
+//     };
+//     qr.decode(img.bitmap);
+//   });
+// }
+
+// test("scan QR → menu list makeorderwitout split", async ({ page, context }) => {
+//   test.setTimeout(120000); // Increase timeout to 120 seconds
+//   // 1) LOGIN
+//   await page.goto("https://dashboard-dev.vastmenu.com/authentication/login");
+//   await page.getByPlaceholder("Email").fill("amr@test.test");
+//   await page.getByPlaceholder("Password").fill("password");
+//   await page.getByRole("button", { name: "Sign In" }).click();
+//   await page.waitForLoadState("networkidle");
+
+//   // 2) Go to tables
+//   await page.getByRole("link", { name: "Tables" }).click();
+//   await page.waitForLoadState("networkidle");
+//   const switchTrack = page.locator('.v-switch__track');
+// try {
+//   await switchTrack.waitFor({ state: 'visible', timeout: 5000 });
+//   await switchTrack.click({ force: true });
+//   console.log('✓ Switch track clicked');
+//   await page.getByRole('button', { name: 'Confirm' }).click();
+//   // Wait a moment for the state to change
+//   await page.waitForTimeout(1000);
+// } catch (error) {
+//   console.log('Switch track not found or not visible, continuing with test...');
+// }
+
+//   // 3) Click the icon that opens the QR modal
+//   const qrButton = page.locator(
+//     "#app div.table-details .table-name-with-status .status div.icon.cursor-pointer"
+//   ).first();
+
+//   await qrButton.waitFor({ state: "visible" });
+//   await qrButton.click();
+
+//   // 4) Wait for QR Image to appear inside the modal
+//   const qrImg = page.locator('img.v-img__img[src*="qrcode"]');
+
+//   await expect(qrImg).toBeVisible();
+//   await qrImg.waitFor({ state: "visible" });
+
+//   // 5) Screenshot ONLY the QR code
+//   const qrBuffer = await qrImg.screenshot();
+
+//   // 6) Decode QR → get URL
+//   const urlInQR = await decodeQR(qrBuffer);
+//   console.log("🔗 QR URL = ", urlInQR);
+
+//   // 7) Open the decoded URL in a new tab
+//   const newPage = await context.newPage();
+//   await newPage.goto(urlInQR);
+//   await newPage.waitForLoadState("domcontentloaded");
+
+//   // 8) Verify page is loaded
+//   await expect(newPage).toBeTruthy();
+//   const page1 = newPage;
+
+//   // --- ORDERING FLOW ---
+  
+//   // Wait for the menu items to be visible
+//   await page1.waitForLoadState("networkidle");
+  
+//   // Add items to cart
+//   // Using more robust waits before clicking
+//   const addBtn1 = page1.getByText('add').nth(1);
+//   await addBtn1.waitFor({ state: 'visible' });
+//   await addBtn1.click();
+
+//   const addBtn0 = page1.getByText('add').first();
+//   await addBtn0.waitFor({ state: 'visible' });
+//   await addBtn0.click();
+
+//   // Open Menu/Category
+//   // Assuming 'Menu' button opens a category or options
+//   const menuBtn = page1.getByRole('button', { name: 'Menu' }).nth(3);
+//   await menuBtn.waitFor({ state: 'visible' });
+//   await menuBtn.click();
+
+//   // Select item '2'
+//   const item2 = page1.getByText('2').nth(1);
+//   await item2.waitFor({ state: 'visible' });
+//   await item2.click();
+
+//   // Verify '2' is added/visible in the app container
+//   await expect(page1.locator('#q-app')).toContainText('2');
+
+//   // Click 'Add' button - this was failing
+//   // Try case-insensitive and wait longer
+//   const addButton = page1.getByRole('button', { name: /add/i }); 
+//   // If button role fails, it might be a div with text, but let's stick to button first with regex
+//   await addButton.waitFor({ state: 'visible', timeout: 15000 });
+//   await addButton.click();
+
+//   // Go to Total/Cart
+//   const totalBtn = page1.getByRole('button', { name: '3 Item Total' });
+//   await totalBtn.waitFor({ state: 'visible' });
+//   await totalBtn.click();
+
+//   // Select Tip (10%)
+//   // await page1.locator('div').filter({ hasText: /^10%$/ }).click();
+
+//   // Confirm Order
+//   await page1.getByRole('button', { name: 'Confirm' }).click();
+
+
+
+//   // Pay
+// await page1.locator('p[class*="text-fontExtraBold"][class*="white"]:has-text("Full pay")').click();  
+//   const payCardBtn = page1.getByRole('button', { name: 'Pay Card' });
+//   await payCardBtn.waitFor({ state: 'visible' });
+//   await payCardBtn.click();
+
+
+//   // Fill Payment Details (in iframe)
+//   // 1. Wait for the container of the iframe (bottom sheet)
+//   const iframeContainer = page1.locator('.card-container');
+//   await iframeContainer.waitFor({ state: 'visible', timeout: 30000 });
+
+//   // 2. Wait for the iframe element itself
+//   const iframeElement = page1.locator('iframe[name="tapFrame"]');
+//   await iframeElement.waitFor({ state: 'visible', timeout: 30000 });
+
+//   // 3. Access the frame
+//   const tapFrameLocator = page1.locator('iframe[name="tapFrame"]');
+//   const tapFrameHandle = await tapFrameLocator.elementHandle();
+
+//     await page1.locator('iframe[name="tapFrame"]').contentFrame().locator('header').click();
+//   await page1.locator('iframe[name="tapFrame"]').contentFrame().getByTestId('CreditCard').fill('5123450000000008\t');
+//   await page1.locator('iframe[name="tapFrame"]').contentFrame().getByRole('textbox', { name: 'MM/YY' }).fill('01/39');
+//   await page1.locator('iframe[name="tapFrame"]').contentFrame().getByRole('textbox', { name: 'CVV' }).fill('100');
+//   await page1.locator('iframe[name="tapFrame"]').contentFrame().getByRole('textbox', { name: 'Card Holder Name (min. 3' }).fill('APPROVe');
+  
+//   // Click Pay button inside the dialog (dialog ID may vary)
+//   await page1.locator('[id^="q-portal--dialog"]').getByRole('button', { name: 'Pay', exact: true }).click();
+  
+//   // Wait for 3D Secure redirect (dynamic URL)
+//   await page1.waitForURL(/authenticate\.alpha\.tap\.company/, { timeout: 20000 });
+  
+//   // Submit 3D Secure challenge
+//   const challengeFrame = page1.locator('iframe[name="challengeFrame"]').contentFrame();
+//   await challengeFrame.getByRole('button', { name: 'Submit' }).click();
+  
+//   // Wait for payment success redirect (dynamic URL)
+//   await page1.waitForURL(/payment-success/, { timeout: 20000 });
+
+//   await page1.locator('#q-portal--dialog--1').getByRole('button', { name: 'Home' }).click();
+//   // await page1.pause();
+//   ///////////////////
+// await page.locator('.mdi-close-circle-outline').click();
+//   await page1.goto('https://pwa-dev.vastmenu.com/');
+//   await page1.getByRole('button', { name: '4 Item Total' }).click();
+  
+//   await expect(page1.locator('#q-app')).toContainText('Payment success');
+//   await expect(page1.locator('#q-app')).toContainText('Download Payment Receipt');
+//   await page.goto('https://dashboard-dev.vastmenu.com/branch-tables');
+//   await page.locator('#switch-40').check();
+//   await page1.goto('https://pwa-dev.vastmenu.com/');
+// //////////////////
+
+
+// });
 
 
 
