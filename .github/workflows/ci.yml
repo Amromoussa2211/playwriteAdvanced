@@ -46,12 +46,22 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
+          # 1. Disable immediate exit on error so the script finishes processing
+          set +e
+          
           echo "========================================="
           echo "Parsing Test Results for Slack"
           echo "========================================="
 
-          # 1. Clean ANSI color codes from the output for easier parsing
-          sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" test-console.log > clean.log
+          # Check if log file exists
+          if [ ! -f "test-console.log" ]; then
+            echo "⚠️ test-console.log not found. Creating empty log to prevent crash."
+            touch test-console.log
+            echo "Error: Test log was not generated." >> test-console.log
+          fi
+
+          # 2. Clean ANSI color codes (fail-safe with || true)
+          sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" test-console.log > clean.log || true
 
           # Initialize variables
           TOTAL_TESTS=0
@@ -60,66 +70,61 @@ jobs:
           TEST_DETAILS=""
           CURRENT_LOG_BUFFER=""
 
-          if [ ! -f "clean.log" ]; then
-            TEST_DETAILS="Error: Log file not found."
-          else
-            # 2. Process line by line
-            while IFS= read -r line; do
-              
-              # A. Capture your Custom Logs ([STEP], [INFO], [WARN], [SUCCESS])
-              # We use grep -E to match any of these prefixes
-              if echo "$line" | grep -qE "^\[(STEP|INFO|WARN|SUCCESS)\]"; then
-                # Format as blockquote for Slack (>)
-                if [ -z "$CURRENT_LOG_BUFFER" ]; then
-                  CURRENT_LOG_BUFFER="> $line"
-                else
-                  CURRENT_LOG_BUFFER="$CURRENT_LOG_BUFFER\n> $line"
-                fi
-              fi
-
-              # B. Detect Test Result Line (Checkmark or Cross)
-              # Playwright 'list' reporter outputs these at the end of a spec
-              if echo "$line" | grep -qE "[✓✗×✘]"; then
-                
-                # Determine Pass/Fail
-                if echo "$line" | grep -q "✓"; then
-                  ICON=":white_check_mark:"
-                  ((PASSED_TESTS++))
-                  # Clean up the line to get just the test name
-                  CLEAN_NAME=$(echo "$line" | sed -E 's/^[[:space:]]*✓[[:space:]]*//')
-                else
-                  ICON=":x:"
-                  ((FAILED_TESTS++))
-                  CLEAN_NAME=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
-                fi
-
-                # Format the entry: Icon + Name
-                ENTRY="$ICON *$CLEAN_NAME*"
-
-                # Add buffered logs if they exist
-                if [ -n "$CURRENT_LOG_BUFFER" ]; then
-                  ENTRY="$ENTRY\n$CURRENT_LOG_BUFFER"
-                fi
-
-                # Append to main Details string
-                if [ -z "$TEST_DETAILS" ]; then
-                  TEST_DETAILS="$ENTRY"
-                else
-                  TEST_DETAILS="$TEST_DETAILS\n\n$ENTRY"
-                fi
-
-                # Clear buffer for the next test
-                CURRENT_LOG_BUFFER=""
-              fi
-
-            done < clean.log
+          # 3. Process line by line
+          # Using file descriptor 3 to avoid subshell issues
+          while IFS= read -r line <&3; do
             
-            TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
-          fi
+            # A. Capture Custom Logs ([STEP], [INFO], [WARN], [SUCCESS])
+            if echo "$line" | grep -qE "^\[(STEP|INFO|WARN|SUCCESS)\]"; then
+              # Format as blockquote for Slack (>)
+              if [ -z "$CURRENT_LOG_BUFFER" ]; then
+                CURRENT_LOG_BUFFER="> $line"
+              else
+                CURRENT_LOG_BUFFER="$CURRENT_LOG_BUFFER\n> $line"
+              fi
+            fi
 
+            # B. Detect Test Result Line (Checkmark or Cross)
+            if echo "$line" | grep -qE "[✓✗×✘]"; then
+              
+              # Determine Pass/Fail
+              if echo "$line" | grep -q "✓"; then
+                ICON=":white_check_mark:"
+                ((PASSED_TESTS++))
+                CLEAN_NAME=$(echo "$line" | sed -E 's/^[[:space:]]*✓[[:space:]]*//')
+              else
+                ICON=":x:"
+                ((FAILED_TESTS++))
+                CLEAN_NAME=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
+              fi
+
+              # Format the entry: Icon + Name
+              # Escape quotes in CLEAN_NAME to prevent JSON breakage
+              CLEAN_NAME=$(echo "$CLEAN_NAME" | sed 's/"/\\"/g')
+              ENTRY="$ICON *$CLEAN_NAME*"
+
+              # Add buffered logs if they exist
+              if [ -n "$CURRENT_LOG_BUFFER" ]; then
+                ENTRY="$ENTRY\n$CURRENT_LOG_BUFFER"
+              fi
+
+              # Append to main Details string
+              if [ -z "$TEST_DETAILS" ]; then
+                TEST_DETAILS="$ENTRY"
+              else
+                TEST_DETAILS="$TEST_DETAILS\n\n$ENTRY"
+              fi
+
+              # Clear buffer for the next test
+              CURRENT_LOG_BUFFER=""
+            fi
+
+          done 3< clean.log
+          
+          TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
           echo "Parsed: $TOTAL_TESTS total, $PASSED_TESTS passed, $FAILED_TESTS failed"
 
-          # 3. Prepare Slack Payload Data
+          # 4. Prepare Slack Payload Data
           REPO_NAME="${GITHUB_REPOSITORY}"
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           RUN_ID="${GITHUB_RUN_ID}"
@@ -133,13 +138,18 @@ jobs:
             STATUS_TEXT="Failed"
             STATUS_EMOJI=":x:"
             STATUS_COLOR="#FF0000"
+          elif [ "$TOTAL_TESTS" -eq 0 ]; then
+             STATUS_TEXT="Error/No Tests"
+             STATUS_EMOJI=":warning:"
+             STATUS_COLOR="#FFCC00"
           else
             STATUS_TEXT="Passed"
             STATUS_EMOJI=":white_check_mark:"
             STATUS_COLOR="#36a64f"
           fi
 
-          # 4. Construct JSON using jq (Handles escaping safely)
+          # 5. Construct JSON using jq
+          # Note: We rely on jq to handle JSON escaping for the body text
           SLACK_MESSAGE=$(jq -n \
             --arg text "$STATUS_EMOJI Playwright Tests $STATUS_TEXT" \
             --arg color "$STATUS_COLOR" \
@@ -161,7 +171,7 @@ jobs:
               ]
             }')
 
-          # 5. Send Notification
+          # 6. Send Notification
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
             curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_WEBHOOK_URL"
             echo "Notification sent."
