@@ -8,7 +8,7 @@ test('Dashboard Flow - Login and change language and check all elements', async 
   // --- STEP 1: NAVIGATE ---
   await test.step('Navigate to login page', async () => {
     console.log("[STEP] Navigating to Login");
-    await page.goto('https://dashboard-staging.vastmenu.com/authentication/login', {
+    await page.goto('https://dashboard-dev.vastmenu.com/authentication/login', {
       waitUntil: 'networkidle'
     });
   });

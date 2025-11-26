@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import Jimp from "jimp-compact";
 import QrCode from "qrcode-reader";
 
+const TABLE_INDEX = 0;
+
 // -------- DECODE QR FUNCTION --------
 async function decodeQR(buffer) {
   const img = await Jimp.read(buffer);
@@ -15,55 +17,75 @@ async function decodeQR(buffer) {
   });
 }
 
+// Reset table before each test to ensure clean state
+// Reset table before each test to ensure clean state
+test.beforeEach(async ({ page }) => {
+  // Increase timeout for setup hook
+  test.setTimeout(60000);
+  console.log("[SETUP] Resetting table state...");
+  
+  // Login to dashboard
+  await page.goto("https://dashboard-dev.vastmenu.com/authentication/login");
+  await page.getByPlaceholder("Email").fill("amr@test.test");
+  await page.getByPlaceholder("Password").fill("password");
+  await page.getByRole("button", { name: "Sign In" }).click();
+  // Use domcontentloaded instead of networkidle for faster login
+  await page.waitForLoadState("domcontentloaded");
+  
+  // Go to tables
+  await page.getByRole("link", { name: "Tables" }).click();
+  await page.waitForLoadState("domcontentloaded");
+  // Wait for tables to be visible to ensure page is loaded
+  await page.locator('.table-details').first().waitFor({ state: "visible", timeout: 30000 });
+  await page.waitForTimeout(1000);
+  
+  // Reset switch track (clear table)
+  const switchTrack = page.locator('.v-switch__track').nth(TABLE_INDEX);
+  try {
+    if (await switchTrack.isVisible({ timeout: 3000 })) {
+      await switchTrack.click({ force: true });
+      console.log('[SETUP] Table reset - switch clicked');
+      
+      const confirmBtn = page.getByRole('button', { name: 'Confirm' });
+      if (await confirmBtn.isVisible({ timeout: 2000 })) {
+        await confirmBtn.click();
+      }
+      await page.waitForTimeout(1000);
+    }
+  } catch (error) {
+    console.log('[SETUP] Table already in correct state');
+  }
+  
+  console.log("[SETUP] Table ready for test");
+});
+
 test("scanQR →ML splitOrder(BYamount) &Validate in report", async ({ page, context }) => {
   // 1. INCREASED TIMEOUT: Set to 5 minutes for slow payment gateways
   test.setTimeout(300000);
 
   // --- STEP 1: LOGIN ---
   await test.step("Login to Dashboard", async () => {
-    console.log("[STEP] Logging in...");
-    await page.goto("https://dashboard-dev.vastmenu.com/authentication/login");
-    await page.getByPlaceholder("Email").fill("amr@test.test");
-    await page.getByPlaceholder("Password").fill("password");
-    await page.getByRole("button", { name: "Sign In" }).click();
-    await page.waitForLoadState("networkidle");
-    console.log("[INFO] Login successful");
+    console.log("[STEP] Starting Login Process...");
+    // Already logged in from beforeEach, just verify
+    await expect(page).toHaveURL(/dashboard-dev.vastmenu.com/);
+    console.log("[INFO] Already logged in from setup");
   });
 
   // --- STEP 2: PREPARE TABLE ---
   await test.step("Prepare Table (Enable Tracking)", async () => {
-    await page.getByRole("link", { name: "Tables" }).click();
-    await page.waitForLoadState("networkidle");
-    
-    // Explicit wait to let the table list render after API call
-    await page.waitForTimeout(3000);
-
-    // Handle the switch track if it exists
-    const switchTrack = page.locator('.v-switch__track');
-    try {
-      if (await switchTrack.isVisible({ timeout: 5000 })) {
-        await switchTrack.click({ force: true });
-        console.log('[INFO] Switch track clicked');
-        
-        // Handle confirm button if it appears
-        const confirmBtn = page.getByRole('button', { name: 'Confirm' });
-        if (await confirmBtn.isVisible({ timeout: 2000 })) {
-           await confirmBtn.click();
-        }
-        await page.waitForTimeout(1000);
-      }
-    } catch (error) {
-      console.log('[INFO] Switch track not needed or not visible');
-    }
+    // Already on tables page from beforeEach
+    await expect(page).toHaveURL(/tables/);
+    console.log("[INFO] Already on tables page from setup");
   });
 
   // --- STEP 3: SCAN QR ---
   let urlInQR;
   await test.step("Scan and Decode QR", async () => {
     console.log("[STEP] Finding QR Button...");
+    // Use FIRST table since we reset state
     const qrButton = page.locator(
       "#app div.table-details .table-name-with-status .status div.icon.cursor-pointer"
-    ).first();
+    ).nth(TABLE_INDEX);
     
     await qrButton.waitFor({ state: "visible", timeout: 30000 });
     await qrButton.click();
@@ -146,8 +168,10 @@ test("scanQR →ML splitOrder(BYamount) &Validate in report", async ({ page, con
     await page1.getByRole('button', { name: 'Pay', exact: true }).click();
     
     // Select Card
-    await page1.locator('div').filter({ hasText: 'closePayment typeChoose the' }).nth(2).click();
-    await page1.getByRole('button', { name: 'Pay Card' }).click();
+    // Select Card
+    const payCardBtn = page1.getByRole('button', { name: 'Pay Card' });
+    await payCardBtn.waitFor({ state: 'visible', timeout: 30000 });
+    await payCardBtn.click();
 
     // Fill Card Details (Iframe)
     const frame = page1.locator('iframe[name="tapFrame"]').contentFrame();
@@ -199,8 +223,10 @@ test("scanQR →ML splitOrder(BYamount) &Validate in report", async ({ page, con
     await page1.locator('#q-portal--dialog--2').getByRole('button', { name: 'Pay' }).click();
     
     // Select Card again
-    await page1.locator('div').filter({ hasText: 'closePayment typeChoose the' }).nth(2).click();
-    await page1.getByRole('button', { name: 'Pay Card' }).click();
+    // Select Card again
+    const payCardBtn2 = page1.getByRole('button', { name: 'Pay Card' });
+    await payCardBtn2.waitFor({ state: 'visible', timeout: 30000 });
+    await payCardBtn2.click();
 
     // Fill Card Details again
     const frame = page1.locator('iframe[name="tapFrame"]').contentFrame();
@@ -228,8 +254,25 @@ test("scanQR →ML splitOrder(BYamount) &Validate in report", async ({ page, con
 
   // --- STEP 8: SUBMIT REVIEW ---
   await test.step("Submit Customer Review", async () => {
+    // Close payment success dialog if it's still open
+    try {
+      const homeBtn = page1.locator('#q-portal--dialog--1').getByRole('button', { name: 'Home' });
+      if (await homeBtn.isVisible({ timeout: 2000 })) {
+        await homeBtn.click();
+        await page1.waitForTimeout(1000);
+        console.log('[INFO] Closed payment success dialog');
+      }
+    } catch (error) {
+      console.log('[INFO] No dialog to close, continuing...');
+    }
+    
+    // Now submit review
     await page1.getByRole('button', { name: 'dark_mode' }).click();
-    await page1.getByRole('radio', { name: '5' }).click();
+    await page1.waitForTimeout(500); // Let review form appear
+    
+    const radio5 = page1.getByRole('radio', { name: '5' });
+    await radio5.waitFor({ state: 'visible', timeout: 10000 });
+    await radio5.click();
     
     await page1.getByPlaceholder('Name').fill('automated revio');
     await page1.getByPlaceholder('Phone number').fill('0559423418');
