@@ -1,3 +1,4 @@
+
 name: Playwright Tests
 
 on:
@@ -20,8 +21,10 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f "package-lock.json" ]; then
+            echo "Found package-lock.json, using npm ci"
             npm ci
           else
+            echo "No package-lock.json found, using npm install"
             npm install
           fi
 
@@ -31,127 +34,205 @@ jobs:
       - name: Run Playwright tests
         id: playwright_tests
         continue-on-error: true
-        # xvfb-run is required to run --headed mode on Linux agents
         run: |
           echo "========================================="
           echo "Starting Playwright Tests"
           echo "========================================="
           
-          # Run specific test, headed, with trace, and pipe output to log
-          xvfb-run npx playwright test tests/web/ML_splitorder-ByAmount.spec.js --headed --trace on --reporter=list,html 2>&1 | tee test-console.log
+          # Run tests with both list and html reporters
+          npx playwright test --reporter=list,html 2>&1 | tee test-console.log
           
-          # Capture exit code safely
-          echo ${PIPESTATUS[0]} > test-exit-code.txt
+          TEST_EXIT_CODE=${PIPESTATUS[0]}
+          echo ""
+          echo "========================================="
+          echo "Test execution completed with exit code: $TEST_EXIT_CODE"
+          echo "========================================="
+          
+          # Store exit code
+          echo $TEST_EXIT_CODE > test-exit-code.txt
 
-      - name: Parse Results and Notify Slack
+      - name: Upload HTML Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Debug - Show console output
+        if: always()
+        run: |
+          echo "========================================="
+          echo "Full Console Output for Debugging"
+          echo "========================================="
+          cat test-console.log
+          echo ""
+          echo "========================================="
+          echo "Looking for symbols in output:"
+          echo "========================================="
+          # Show all lines with test symbols
+          grep -n "✓\|✗\|×\|✘" test-console.log || echo "No test symbols found"
+
+      - name: Parse test results and send Slack notification
         if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          # 1. Prevent crash on error
-          set +e
+          echo "========================================="
+          echo "Parsing Test Results"
+          echo "========================================="
           
-          echo "========================================="
-          echo "Parsing Test Results for Slack"
-          echo "========================================="
-
-          # Check log existence
-          if [ ! -f "test-console.log" ]; then
-            touch test-console.log
-            echo "Error: Test log was not generated." >> test-console.log
-          fi
-
-          # 2. Clean ANSI colors
-          sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" test-console.log > clean.log || true
-
-          # Initialize
+          # Initialize variables
           TOTAL_TESTS=0
           PASSED_TESTS=0
           FAILED_TESTS=0
-          TEST_DETAILS=""
-          CURRENT_LOG_BUFFER=""
-
-          # 3. Process line by line
-          # We use file descriptor 3 to avoid subshell variable scope issues
-          while IFS= read -r line <&3; do
-            
-            # A. Capture Custom Logs
-            if echo "$line" | grep -qE "^\[(STEP|INFO|WARN|SUCCESS)\]"; then
-              if [ -z "$CURRENT_LOG_BUFFER" ]; then
-                CURRENT_LOG_BUFFER="> $line"
-              else
-                # Use printf to create actual newlines in the variable
-                CURRENT_LOG_BUFFER=$(printf "%s\n> %s" "$CURRENT_LOG_BUFFER" "$line")
-              fi
-            fi
-
-            # B. Detect Test Result
-            if echo "$line" | grep -qE "[✓✗×✘]"; then
-              
-              if echo "$line" | grep -q "✓"; then
-                ICON=":white_check_mark:"
-                ((PASSED_TESTS++))
-                CLEAN_NAME=$(echo "$line" | sed -E 's/^[[:space:]]*✓[[:space:]]*//')
-              else
-                ICON=":x:"
-                ((FAILED_TESTS++))
-                CLEAN_NAME=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
-              fi
-
-              # Escape quotes in test name
-              CLEAN_NAME=$(echo "$CLEAN_NAME" | sed 's/"/\\"/g')
-              ENTRY="$ICON *$CLEAN_NAME*"
-
-              # Append logs if they exist
-              if [ -n "$CURRENT_LOG_BUFFER" ]; then
-                ENTRY=$(printf "%s\n%s" "$ENTRY" "$CURRENT_LOG_BUFFER")
-              fi
-
-              # Append to main Details
-              if [ -z "$TEST_DETAILS" ]; then
-                TEST_DETAILS="$ENTRY"
-              else
-                TEST_DETAILS=$(printf "%s\n\n%s" "$TEST_DETAILS" "$ENTRY")
-              fi
-
-              # Clear buffer
-              CURRENT_LOG_BUFFER=""
-            fi
-
-          done 3< clean.log
+          FAILED_LIST=""
+          PASSED_LIST=""
           
-          TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
-          echo "Parsed: $TOTAL_TESTS total, $PASSED_TESTS passed, $FAILED_TESTS failed"
-
-          # 4. Prepare Data
+          # Check if we have test console log
+          if [ ! -f "test-console.log" ]; then
+            echo "ERROR: No test console log found"
+            TEST_DETAILS="- :x: Test execution log not found"
+          else
+            echo "Parsing test results from console output..."
+            
+            # Try multiple patterns for failed tests
+            # Pattern 1: Lines starting with ✗
+            echo "Trying pattern 1: ^[[:space:]]*✗"
+            FAILED_LIST=$(grep "✗" test-console.log 2>/dev/null | while IFS= read -r line; do
+              clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
+              if [ -n "$clean_line" ]; then
+                echo "- :x: $clean_line"
+              fi
+            done)
+            
+            # Pattern 2: If pattern 1 failed, try ×
+            if [ -z "$FAILED_LIST" ]; then
+              echo "Trying pattern 2: ×"
+              FAILED_LIST=$(grep "×" test-console.log 2>/dev/null | while IFS= read -r line; do
+                clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
+                if [ -n "$clean_line" ]; then
+                  echo "- :x: $clean_line"
+                fi
+              done)
+            fi
+            
+            # Pattern 3: If still nothing, try looking for "FAILED" or "failed"
+            if [ -z "$FAILED_LIST" ]; then
+              echo "Trying pattern 3: lines containing 'failed'"
+              FAILED_LIST=$(grep -i "failed" test-console.log | grep -v "0 failed" | grep -E "tests?/" | while IFS= read -r line; do
+                echo "- :x: $line"
+              done)
+            fi
+            
+            if [ -n "$FAILED_LIST" ]; then
+              echo "Found failed tests:"
+              echo "$FAILED_LIST"
+            else
+              echo "No failed tests details found"
+            fi
+            
+            # Extract PASSED tests
+            echo ""
+            echo "Extracting PASSED tests..."
+            PASSED_LIST=$(grep "✓" test-console.log 2>/dev/null | while IFS= read -r line; do
+              clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*✓[[:space:]]*//')
+              if [ -n "$clean_line" ]; then
+                echo "- :white_check_mark: $clean_line"
+              fi
+            done)
+            
+            if [ -n "$PASSED_LIST" ]; then
+              echo "Found passed tests:"
+              echo "$PASSED_LIST"
+            fi
+            
+            # Count tests from summary line
+            echo ""
+            echo "Extracting test counts from summary..."
+            if grep -qE "[0-9]+ (passed|failed)" test-console.log; then
+              PASSED_TESTS=$(grep -oP '(\d+) passed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
+              FAILED_TESTS=$(grep -oP '(\d+) failed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
+              TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
+              
+              echo "Summary: Total=$TOTAL_TESTS, Passed=$PASSED_TESTS, Failed=$FAILED_TESTS"
+            fi
+          fi
+          
+          echo ""
+          echo "========================================="
+          echo "Building Slack notification..."
+          echo "========================================="
+          
+          # Combine test details: FAILED FIRST, then PASSED
+          TEST_DETAILS=""
+          
+          # Add failed tests
+          if [ -n "$FAILED_LIST" ] && [ "$FAILED_LIST" != "" ]; then
+            TEST_DETAILS="$FAILED_LIST"
+            FAILED_COUNT=$(echo "$FAILED_LIST" | grep -c "^- :x:")
+            echo "Added $FAILED_COUNT failed test(s)"
+          else
+            if [ "$FAILED_TESTS" -gt 0 ]; then
+              # Fallback message
+              TEST_DETAILS="- :x: $FAILED_TESTS test(s) failed - details in logs"
+              echo "Using fallback for failed tests"
+            fi
+          fi
+          
+          # Add passed tests
+          if [ -n "$PASSED_LIST" ] && [ "$PASSED_LIST" != "" ]; then
+            if [ -n "$TEST_DETAILS" ]; then
+              TEST_DETAILS=$(printf "%s\n\n%s" "$TEST_DETAILS" "$PASSED_LIST")
+            else
+              TEST_DETAILS="$PASSED_LIST"
+            fi
+            PASSED_COUNT=$(echo "$PASSED_LIST" | grep -c "^- :white_check_mark:")
+            echo "Added $PASSED_COUNT passed test(s)"
+          fi
+          
+          # Get git information
           REPO_NAME="${GITHUB_REPOSITORY}"
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           COMMIT_SHA="${GITHUB_SHA:0:8}"
           RUN_ID="${GITHUB_RUN_ID}"
-          ACTIONS_LINK="https://github.com/$REPO_NAME/actions/runs/$RUN_ID"
           
-          # Footer
-          TEST_DETAILS=$(printf "%s\n\n📊 <$ACTIONS_LINK|View Execution Log>" "$TEST_DETAILS")
-
-          # Status Logic
-          if [ "$FAILED_TESTS" -gt 0 ]; then
-            STATUS_TEXT="Failed"
+          # Create links
+          ACTIONS_LINK="https://github.com/$REPO_NAME/actions/runs/$RUN_ID"
+          HTML_REPORT_LINK="https://github.com/$REPO_NAME/actions/runs/$RUN_ID"
+          
+          # Add links to test details
+          TEST_DETAILS=$(printf "%s\n\n📊 *Reports:*\n• <$ACTIONS_LINK|View Execution Log>\n• <$HTML_REPORT_LINK/|Download HTML Report>" "$TEST_DETAILS")
+          
+          # Determine overall status
+          if [ "$TOTAL_TESTS" -eq 0 ]; then
+            STATUS_EMOJI=":warning:"
+            STATUS_TEXT="No Tests Found"
+            STATUS_COLOR="#FFA500"
+          elif [ "$FAILED_TESTS" -gt 0 ]; then
             STATUS_EMOJI=":x:"
+            STATUS_TEXT="Failed"
             STATUS_COLOR="#FF0000"
-          elif [ "$TOTAL_TESTS" -eq 0 ]; then
-             STATUS_TEXT="No Tests"
-             STATUS_EMOJI=":warning:"
-             STATUS_COLOR="#FFCC00"
           else
-            STATUS_TEXT="Passed"
             STATUS_EMOJI=":white_check_mark:"
+            STATUS_TEXT="Passed"
             STATUS_COLOR="#36a64f"
           fi
-
-          # 5. Construct JSON Payload using jq
-          # jq will correctly encode the newlines in TEST_DETAILS into \n for JSON
+          
+          echo ""
+          echo "Final Summary:"
+          echo "  Status: $STATUS_TEXT"
+          echo "  Total: $TOTAL_TESTS"
+          echo "  Passed: $PASSED_TESTS"
+          echo "  Failed: $FAILED_TESTS"
+          echo ""
+          
+          # Escape for JSON (handle special characters properly)
+          TEST_DETAILS_ESCAPED=$(echo "$TEST_DETAILS" | jq -Rs . | sed 's/^"//' | sed 's/"$//')
+          
+          # Create Slack message using jq for proper JSON encoding
           SLACK_MESSAGE=$(jq -n \
-            --arg text "$STATUS_EMOJI Playwright Tests $STATUS_TEXT" \
+            --arg text "${STATUS_EMOJI} Playwright Tests ${STATUS_TEXT}" \
             --arg color "$STATUS_COLOR" \
             --arg repo "$REPO_NAME" \
             --arg branch "$BRANCH_NAME" \
@@ -166,372 +247,88 @@ jobs:
                 {
                   "color": $color,
                   "fields": [
-                    { "title": "Repository", "value": $repo, "short": true },
-                    { "title": "Branch", "value": $branch, "short": true },
-                    { "title": "Commit", "value": $commit, "short": true },
-                    { "title": "Total Tests", "value": $total, "short": true },
-                    { "title": "Passed", "value": $passed, "short": true },
-                    { "title": "Failed", "value": $failed, "short": true },
-                    { "title": "Test Details", "value": $details, "short": false }
+                    {
+                      "title": "Repository",
+                      "value": $repo,
+                      "short": true
+                    },
+                    {
+                      "title": "Branch",
+                      "value": $branch,
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": $commit,
+                      "short": true
+                    },
+                    {
+                      "title": "Total Tests",
+                      "value": $total,
+                      "short": true
+                    },
+                    {
+                      "title": "Passed",
+                      "value": $passed,
+                      "short": true
+                    },
+                    {
+                      "title": "Failed",
+                      "value": $failed,
+                      "short": true
+                    },
+                    {
+                      "title": "Test Details",
+                      "value": $details,
+                      "short": false
+                    }
                   ]
                 }
               ]
             }')
-
-          # 6. Send
+          
+          # Send to Slack
+          echo "Sending notification to Slack..."
+          
+          # Debug webhook
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_WEBHOOK_URL"
-            echo "Notification sent."
+            echo "✅ SLACK_WEBHOOK_URL is set"
+            echo "📊 Webhook URL length: ${#SLACK_WEBHOOK_URL} characters"
+            echo "🔑 First 10 chars: ${SLACK_WEBHOOK_URL:0:10}..."
           else
-            echo "Skipping Slack: Secret not set."
+            echo "❌ SLACK_WEBHOOK_URL is NOT set"
           fi
+          
+          # Send the message
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST -H 'Content-type: application/json' \
+            --data "$SLACK_MESSAGE" \
+            "$SLACK_WEBHOOK_URL")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+          
+          echo ""
+          echo "Slack Response:"
+          echo "  HTTP Code: $HTTP_CODE"
+          echo "  Response: $RESPONSE_BODY"
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Notification sent successfully"
+          else
+            echo "❌ Failed to send notification"
+          fi
+          
+          echo ""
+          echo "========================================="
+          echo "Done"
+          echo "========================================="
 
-      - name: Upload HTML Report
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: playwright-report/
+          name: test-console-log
+          path: test-console.log
           retention-days: 30
-
-      - name: Check Test Status
-        if: always()
-        run: |
-          EXIT_CODE=$(cat test-exit-code.txt)
-          if [ "$EXIT_CODE" -ne "0" ]; then
-            echo "Tests failed with exit code $EXIT_CODE"
-            exit $EXIT_CODE
-          fi
-# name: Playwright Tests
-
-# on:
-#   push:
-#     branches: [master, main]
-#   pull_request:
-#     branches: [master, main]
-
-# jobs:
-#   test:
-#     timeout-minutes: 60
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v4
-
-#       - uses: actions/setup-node@v4
-#         with:
-#           node-version: lts/*
-
-#       - name: Install dependencies
-#         run: |
-#           if [ -f "package-lock.json" ]; then
-#             echo "Found package-lock.json, using npm ci"
-#             npm ci
-#           else
-#             echo "No package-lock.json found, using npm install"
-#             npm install
-#           fi
-
-#       - name: Install Playwright Browsers
-#         run: npx playwright install --with-deps
-
-#       - name: Run Playwright tests
-#         id: playwright_tests
-#         continue-on-error: true
-#         run: |
-#           echo "========================================="
-#           echo "Starting Playwright Tests"
-#           echo "========================================="
-          
-#           # Run tests with both list and html reporters
-#           npx playwright test --reporter=list,html 2>&1 | tee test-console.log
-          
-#           TEST_EXIT_CODE=${PIPESTATUS[0]}
-#           echo ""
-#           echo "========================================="
-#           echo "Test execution completed with exit code: $TEST_EXIT_CODE"
-#           echo "========================================="
-          
-#           # Store exit code
-#           echo $TEST_EXIT_CODE > test-exit-code.txt
-
-#       - name: Upload HTML Report
-#         if: always()
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: playwright-html-report
-#           path: playwright-report/
-#           retention-days: 30
-
-#       - name: Debug - Show console output
-#         if: always()
-#         run: |
-#           echo "========================================="
-#           echo "Full Console Output for Debugging"
-#           echo "========================================="
-#           cat test-console.log
-#           echo ""
-#           echo "========================================="
-#           echo "Looking for symbols in output:"
-#           echo "========================================="
-#           # Show all lines with test symbols
-#           grep -n "✓\|✗\|×\|✘" test-console.log || echo "No test symbols found"
-
-#       - name: Parse test results and send Slack notification
-#         if: always()
-#         env:
-#           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-#         run: |
-#           echo "========================================="
-#           echo "Parsing Test Results"
-#           echo "========================================="
-          
-#           # Initialize variables
-#           TOTAL_TESTS=0
-#           PASSED_TESTS=0
-#           FAILED_TESTS=0
-#           FAILED_LIST=""
-#           PASSED_LIST=""
-          
-#           # Check if we have test console log
-#           if [ ! -f "test-console.log" ]; then
-#             echo "ERROR: No test console log found"
-#             TEST_DETAILS="- :x: Test execution log not found"
-#           else
-#             echo "Parsing test results from console output..."
-            
-#             # Try multiple patterns for failed tests
-#             # Pattern 1: Lines starting with ✗
-#             echo "Trying pattern 1: ^[[:space:]]*✗"
-#             FAILED_LIST=$(grep "✗" test-console.log 2>/dev/null | while IFS= read -r line; do
-#               clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
-#               if [ -n "$clean_line" ]; then
-#                 echo "- :x: $clean_line"
-#               fi
-#             done)
-            
-#             # Pattern 2: If pattern 1 failed, try ×
-#             if [ -z "$FAILED_LIST" ]; then
-#               echo "Trying pattern 2: ×"
-#               FAILED_LIST=$(grep "×" test-console.log 2>/dev/null | while IFS= read -r line; do
-#                 clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*[✗×✘][[:space:]]*//')
-#                 if [ -n "$clean_line" ]; then
-#                   echo "- :x: $clean_line"
-#                 fi
-#               done)
-#             fi
-            
-#             # Pattern 3: If still nothing, try looking for "FAILED" or "failed"
-#             if [ -z "$FAILED_LIST" ]; then
-#               echo "Trying pattern 3: lines containing 'failed'"
-#               FAILED_LIST=$(grep -i "failed" test-console.log | grep -v "0 failed" | grep -E "tests?/" | while IFS= read -r line; do
-#                 echo "- :x: $line"
-#               done)
-#             fi
-            
-#             if [ -n "$FAILED_LIST" ]; then
-#               echo "Found failed tests:"
-#               echo "$FAILED_LIST"
-#             else
-#               echo "No failed tests details found"
-#             fi
-            
-#             # Extract PASSED tests
-#             echo ""
-#             echo "Extracting PASSED tests..."
-#             PASSED_LIST=$(grep "✓" test-console.log 2>/dev/null | while IFS= read -r line; do
-#               clean_line=$(echo "$line" | sed -E 's/^[[:space:]]*✓[[:space:]]*//')
-#               if [ -n "$clean_line" ]; then
-#                 echo "- :white_check_mark: $clean_line"
-#               fi
-#             done)
-            
-#             if [ -n "$PASSED_LIST" ]; then
-#               echo "Found passed tests:"
-#               echo "$PASSED_LIST"
-#             fi
-            
-#             # Count tests from summary line
-#             echo ""
-#             echo "Extracting test counts from summary..."
-#             if grep -qE "[0-9]+ (passed|failed)" test-console.log; then
-#               PASSED_TESTS=$(grep -oP '(\d+) passed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
-#               FAILED_TESTS=$(grep -oP '(\d+) failed' test-console.log | tail -1 | grep -oP '\d+' || echo "0")
-#               TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
-              
-#               echo "Summary: Total=$TOTAL_TESTS, Passed=$PASSED_TESTS, Failed=$FAILED_TESTS"
-#             fi
-#           fi
-          
-#           echo ""
-#           echo "========================================="
-#           echo "Building Slack notification..."
-#           echo "========================================="
-          
-#           # Combine test details: FAILED FIRST, then PASSED
-#           TEST_DETAILS=""
-          
-#           # Add failed tests
-#           if [ -n "$FAILED_LIST" ] && [ "$FAILED_LIST" != "" ]; then
-#             TEST_DETAILS="$FAILED_LIST"
-#             FAILED_COUNT=$(echo "$FAILED_LIST" | grep -c "^- :x:")
-#             echo "Added $FAILED_COUNT failed test(s)"
-#           else
-#             if [ "$FAILED_TESTS" -gt 0 ]; then
-#               # Fallback message
-#               TEST_DETAILS="- :x: $FAILED_TESTS test(s) failed - details in logs"
-#               echo "Using fallback for failed tests"
-#             fi
-#           fi
-          
-#           # Add passed tests
-#           if [ -n "$PASSED_LIST" ] && [ "$PASSED_LIST" != "" ]; then
-#             if [ -n "$TEST_DETAILS" ]; then
-#               TEST_DETAILS=$(printf "%s\n\n%s" "$TEST_DETAILS" "$PASSED_LIST")
-#             else
-#               TEST_DETAILS="$PASSED_LIST"
-#             fi
-#             PASSED_COUNT=$(echo "$PASSED_LIST" | grep -c "^- :white_check_mark:")
-#             echo "Added $PASSED_COUNT passed test(s)"
-#           fi
-          
-#           # Get git information
-#           REPO_NAME="${GITHUB_REPOSITORY}"
-#           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-#           COMMIT_SHA="${GITHUB_SHA:0:8}"
-#           RUN_ID="${GITHUB_RUN_ID}"
-          
-#           # Create links
-#           ACTIONS_LINK="https://github.com/$REPO_NAME/actions/runs/$RUN_ID"
-#           HTML_REPORT_LINK="https://github.com/$REPO_NAME/actions/runs/$RUN_ID"
-          
-#           # Add links to test details
-#           TEST_DETAILS=$(printf "%s\n\n📊 *Reports:*\n• <$ACTIONS_LINK|View Execution Log>\n• <$HTML_REPORT_LINK/|Download HTML Report>" "$TEST_DETAILS")
-          
-#           # Determine overall status
-#           if [ "$TOTAL_TESTS" -eq 0 ]; then
-#             STATUS_EMOJI=":warning:"
-#             STATUS_TEXT="No Tests Found"
-#             STATUS_COLOR="#FFA500"
-#           elif [ "$FAILED_TESTS" -gt 0 ]; then
-#             STATUS_EMOJI=":x:"
-#             STATUS_TEXT="Failed"
-#             STATUS_COLOR="#FF0000"
-#           else
-#             STATUS_EMOJI=":white_check_mark:"
-#             STATUS_TEXT="Passed"
-#             STATUS_COLOR="#36a64f"
-#           fi
-          
-#           echo ""
-#           echo "Final Summary:"
-#           echo "  Status: $STATUS_TEXT"
-#           echo "  Total: $TOTAL_TESTS"
-#           echo "  Passed: $PASSED_TESTS"
-#           echo "  Failed: $FAILED_TESTS"
-#           echo ""
-          
-#           # Escape for JSON (handle special characters properly)
-#           TEST_DETAILS_ESCAPED=$(echo "$TEST_DETAILS" | jq -Rs . | sed 's/^"//' | sed 's/"$//')
-          
-#           # Create Slack message using jq for proper JSON encoding
-#           SLACK_MESSAGE=$(jq -n \
-#             --arg text "${STATUS_EMOJI} Playwright Tests ${STATUS_TEXT}" \
-#             --arg color "$STATUS_COLOR" \
-#             --arg repo "$REPO_NAME" \
-#             --arg branch "$BRANCH_NAME" \
-#             --arg commit "$COMMIT_SHA" \
-#             --arg total "$TOTAL_TESTS" \
-#             --arg passed "$PASSED_TESTS" \
-#             --arg failed "$FAILED_TESTS" \
-#             --arg details "$TEST_DETAILS" \
-#             '{
-#               "text": $text,
-#               "attachments": [
-#                 {
-#                   "color": $color,
-#                   "fields": [
-#                     {
-#                       "title": "Repository",
-#                       "value": $repo,
-#                       "short": true
-#                     },
-#                     {
-#                       "title": "Branch",
-#                       "value": $branch,
-#                       "short": true
-#                     },
-#                     {
-#                       "title": "Commit",
-#                       "value": $commit,
-#                       "short": true
-#                     },
-#                     {
-#                       "title": "Total Tests",
-#                       "value": $total,
-#                       "short": true
-#                     },
-#                     {
-#                       "title": "Passed",
-#                       "value": $passed,
-#                       "short": true
-#                     },
-#                     {
-#                       "title": "Failed",
-#                       "value": $failed,
-#                       "short": true
-#                     },
-#                     {
-#                       "title": "Test Details",
-#                       "value": $details,
-#                       "short": false
-#                     }
-#                   ]
-#                 }
-#               ]
-#             }')
-          
-#           # Send to Slack
-#           echo "Sending notification to Slack..."
-          
-#           # Debug webhook
-#           if [ -n "$SLACK_WEBHOOK_URL" ]; then
-#             echo "✅ SLACK_WEBHOOK_URL is set"
-#             echo "📊 Webhook URL length: ${#SLACK_WEBHOOK_URL} characters"
-#             echo "🔑 First 10 chars: ${SLACK_WEBHOOK_URL:0:10}..."
-#           else
-#             echo "❌ SLACK_WEBHOOK_URL is NOT set"
-#           fi
-          
-#           # Send the message
-#           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST -H 'Content-type: application/json' \
-#             --data "$SLACK_MESSAGE" \
-#             "$SLACK_WEBHOOK_URL")
-          
-#           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-#           RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
-          
-#           echo ""
-#           echo "Slack Response:"
-#           echo "  HTTP Code: $HTTP_CODE"
-#           echo "  Response: $RESPONSE_BODY"
-          
-#           if [ "$HTTP_CODE" = "200" ]; then
-#             echo "✅ Notification sent successfully"
-#           else
-#             echo "❌ Failed to send notification"
-#           fi
-          
-#           echo ""
-#           echo "========================================="
-#           echo "Done"
-#           echo "========================================="
-
-#       - uses: actions/upload-artifact@v4
-#         if: always()
-#         with:
-#           name: test-console-log
-#           path: test-console.log
-#           retention-days: 30
 
 
 

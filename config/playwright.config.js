@@ -18,7 +18,7 @@ module.exports = defineConfig({
   retries: process.env.CI ? 2 : 0,
   
   /* عدد العمليات المتوازية */
-  workers: process.env.CI ? 0 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   
   /* المراسل (Reporter) */
   reporter: [
