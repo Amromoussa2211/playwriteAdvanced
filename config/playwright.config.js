@@ -12,13 +12,13 @@ module.exports = defineConfig({
   timeout: 30 * 1000,
   
   /* تكوين الاختبارات بالتوازي */
-  fullyParallel: true,
+  fullyParallel: false,
   
   /* إعادة المحاولة عند الفشل */
   retries: process.env.CI ? 2 : 0,
   
   /* عدد العمليات المتوازية */
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 1 : undefined,
   
   /* المراسل (Reporter) */
   reporter: [
