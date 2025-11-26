@@ -151,7 +151,7 @@ test("scan QR → menu list makeorderwitout split", async ({ page, context }) =>
 
   // --- STEP 8: 3D SECURE & SUCCESS ---
   await test.step("Handle 3D Secure and Verify Success", async () => {
-    await page1.waitForURL(/authenticate\.alpha\.tap\.company/, { timeout: 20000 });
+    await page1.waitForURL(/authenticate\.alpha\.tap\.company/, { timeout: 60000, waitUntil: 'domcontentloaded' });
     
     const challengeFrame = page1.locator('iframe[name="challengeFrame"]').contentFrame();
     await challengeFrame.getByRole('button', { name: 'Submit' }).click();
