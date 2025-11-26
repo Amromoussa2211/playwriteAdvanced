@@ -15,7 +15,7 @@ async function decodeQR(buffer) {
   });
 }
 
-test("scanQR →ML splitOrder(BYamount) &Validate in report", async ({ page, context }) => {
+test("scanQR →ML splitOrder(BYItem) &Validate in report", async ({ page, context }) => {
   // 1. INCREASED TIMEOUT: Set to 5 minutes for slow payment gateways
   test.setTimeout(300000);
 
