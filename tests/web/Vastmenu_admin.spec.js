@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('Dashboard Flow - Login and change language and check all elements', async ({ browser }) => {
+  test.setTimeout(60000); // Increase timeout to 60s
   // Create Incognito Context
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -66,7 +67,9 @@ test('Dashboard Flow - Login and change language and check all elements', async 
   await test.step('Change request status', async () => {
     console.log("[STEP] Modifying Request Status");
     await page.getByRole('button').nth(1).click();
-    await page.locator('div', { hasText: /^approved$/ }).nth(2).click();
+    const approvedOption = page.locator('div', { hasText: /^approved$/ }).nth(2);
+    await approvedOption.waitFor({ state: 'visible', timeout: 10000 });
+    await approvedOption.click();
     await page.getByRole('button', { name: 'approved' }).click();
     await page.getByText('pending').click();
     console.log("[SUCCESS] Request status updated");

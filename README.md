@@ -6,6 +6,7 @@ An integrated automation framework that supports web testing using **Playwright*
 
 - ✅ **Web Testing**: Using Playwright with support for all browsers (Chrome, Firefox, Safari)
 - ✅ **Mobile Testing**: Using Appium for Android and iOS
+- ✅ **Performance Testing**: Comprehensive load testing framework with beautiful HTML reports
 - ✅ **Automatic Installation**: Automatically installs all dependencies on first run
 - ✅ **Docker**: Full support for running with Docker for environment consistency
 - ✅ **CI/CD**: Ready pipeline on GitHub Actions
@@ -101,6 +102,11 @@ npm run test:mobile
 npm run test:all
 ```
 
+#### Performance tests
+```bash
+npm run test:performance
+```
+
 #### Using Docker
 ```bash
 # Build containers
@@ -127,10 +133,15 @@ test-automation-framework/
 │   ├── web/                      # Web tests
 │   │   ├── login.spec.js
 │   │   └── homepage.spec.js
-│   └── mobile/                   # Mobile tests
-│       ├── android.test.js
-│       ├── ios.test.js
-│       └── runner.js
+│   ├── mobile/                   # Mobile tests
+│   │   ├── android.test.js
+│   │   ├── ios.test.js
+│   │   └── runner.js
+│   └── performance/              # Performance tests
+│       ├── config.js             # Performance test config
+│       ├── runner.js             # Test execution engine
+│       ├── quick-start.js        # Quick test example
+│       └── *.md                  # Documentation
 ├── utils/
 │   ├── slack-notifier.js         # Slack utility
 │   ├── email-notifier.js         # Email utility
@@ -140,6 +151,10 @@ test-automation-framework/
 │   └── post-test.js              # Post-test processing
 ├── reports/                      # Reports
 ├── test-results/                 # Test results
+│   └── performance/              # Performance test results
+│       ├── performance-report.html
+│       ├── performance-metrics.json
+│       └── performance-data.csv
 ├── playwright-report/            # Playwright HTML reports
 ├── docker-compose.yml            # Docker Compose
 ├── package.json                  # Dependencies
@@ -222,6 +237,99 @@ npx appium --address 0.0.0.0 --port 4723
 # Run tests
 npm run test:mobile
 ```
+
+## 🚀 Performance Testing
+
+### Overview
+
+The framework includes a comprehensive performance testing suite that simulates high request loads, identifies bottlenecks, and generates detailed HTML reports.
+
+### Quick Start
+
+```bash
+# Run quick test (30 seconds, 10 users)
+node tests/performance/quick-start.js
+
+# Run full test (60 seconds, 50 users)
+npm run test:performance
+
+# View HTML report
+npm run report:performance
+```
+
+### Features
+
+- ✅ **Configurable Load Testing**: 1-1000+ concurrent users
+- ✅ **Multiple Scenarios**: Customer orders, admin operations, split payments
+- ✅ **Comprehensive Metrics**: Response times, throughput, error rates
+- ✅ **Beautiful HTML Reports**: Charts, tables, threshold violations
+- ✅ **Easy Configuration**: Single config file to edit
+- ✅ **No Code Changes**: Runs independently of your project
+
+### Configuration
+
+Edit `tests/performance/config.js`:
+
+```javascript
+module.exports = {
+  // Load parameters
+  CONCURRENT_USERS: 50,      // Number of users
+  TEST_DURATION: 60,         // Duration in seconds
+  RAMP_UP_TIME: 10,          // Ramp-up time
+  
+  // Performance thresholds
+  THRESHOLDS: {
+    RESPONSE_TIME: {
+      P95: 2000,             // 95% < 2s
+    },
+    ERROR_RATE: 1,           // < 1% errors
+    MIN_THROUGHPUT: 100      // > 100 req/s
+  }
+};
+```
+
+### Test Scenarios
+
+1. **Customer Order Flow** (40% of users)
+   - Browse menu → Add items → Order → Pay
+
+2. **Admin Dashboard** (30% of users)
+   - Login → View tables → Check reports
+
+3. **Split Payment** (20% of users)
+   - Create order → Split invoice → Multiple payments
+
+4. **Menu Browsing** (10% of users)
+   - Browse categories → View items
+
+### Documentation
+
+- **Getting Started**: `tests/performance/GETTING_STARTED.md`
+- **Full Documentation**: `tests/performance/README.md`
+- **Quick Reference**: `tests/performance/SUMMARY.md`
+- **Examples**: `tests/performance/USAGE_EXAMPLES.md`
+
+### Common Use Cases
+
+```bash
+# Daily health check (10 users, 30s)
+node tests/performance/quick-start.js
+
+# Pre-release validation (100 users, 5min)
+# Edit config.js: CONCURRENT_USERS: 100, TEST_DURATION: 300
+npm run test:performance
+
+# Stress testing (500 users, 10min)
+# Edit config.js: CONCURRENT_USERS: 500, TEST_DURATION: 600
+npm run test:performance
+```
+
+### Reports
+
+After running tests, find results in:
+- **HTML Report**: `test-results/performance/performance-report.html`
+- **JSON Data**: `test-results/performance/performance-metrics.json`
+- **CSV Export**: `test-results/performance/performance-data.csv`
 
 ## 📊 Reports
 
