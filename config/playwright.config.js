@@ -12,7 +12,7 @@ module.exports = defineConfig({
   timeout: 120 * 1000, // 2 minutes (was 30s)
   
   /* تكوين الاختبارات بالتوازي - DISABLED in CI for stability */
-  fullyParallel: !process.env.CI, // Only parallel locally
+  fullyParallel: true, // Only parallel locally
   
   /* إعادة المحاولة عند الفشل - INCREASED */
   retries: process.env.CI ? 3 : 0, // 3 retries in CI (was 2)

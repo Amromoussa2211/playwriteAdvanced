@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import Jimp from "jimp-compact";
 import QrCode from "qrcode-reader";
 
-const TABLE_INDEX = 1;
+const TABLE_INDEX = 2; // Using table index 0 for split order test (different from ML_order_withoutSplit.spec.js)
 
 // -------- DECODE QR FUNCTION --------
 async function decodeQR(buffer) {
@@ -36,29 +36,42 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole("link", { name: "Tables" }).click();
   await page.waitForLoadState("domcontentloaded");
   // Wait for tables to be visible to ensure page is loaded
-  await page.locator('.table-details').first().waitFor({ state: "visible", timeout: 30000 });
+  await page.locator('.table-details').nth(TABLE_INDEX).waitFor({ state: "visible", timeout: 30000 });
   await page.waitForTimeout(1000);
-  
   // Reset switch track (clear table)
-  const switchTrack = page.locator('.v-switch__track').nth(TABLE_INDEX);
   try {
-    if (await switchTrack.isVisible({ timeout: 3000 })) {
-      await switchTrack.click({ force: true });
-      console.log('[SETUP] Table reset - switch clicked');
+    // Wait for at least one table to be visible
+    const tables = page.locator('.table-details');
+    await tables.last().waitFor({ state: "visible", timeout: 10000 });
+    
+    const tableCount = await tables.count();
+    console.log(`[DEBUG] Found ${tableCount} tables`);
+
+    if (tableCount > TABLE_INDEX) {
+      const targetTable = tables.nth(TABLE_INDEX);
+      // Look for the switch specifically within this table's row/card
+      const switchTrack = targetTable.locator('.v-switch__track');
       
-      const confirmBtn = page.getByRole('button', { name: 'Confirm' });
-      if (await confirmBtn.isVisible({ timeout: 2000 })) {
-        await confirmBtn.click();
+      if (await switchTrack.isVisible({ timeout: 5000 })) {
+        await switchTrack.click({ force: true });
+        console.log('[SETUP] Table reset - switch clicked');
+        
+        const confirmBtn = page.getByRole('button', { name: 'Confirm' });
+        if (await confirmBtn.isVisible({ timeout: 2000 })) {
+          await confirmBtn.click();
+          console.log('[SETUP] Confirmed reset');
+        }
+        await page.waitForTimeout(1000);
+      } else {
+        console.log(`[WARN] Switch not visible in table ${TABLE_INDEX}. It might be already clean or selector is wrong.`);
       }
-      await page.waitForTimeout(1000);
+    } else {
+      console.log(`[WARN] Not enough tables found. Expected index ${TABLE_INDEX}, found ${tableCount}`);
     }
   } catch (error) {
-    console.log('[SETUP] Table already in correct state');
+    console.log(`[SETUP] Error during table reset: ${error.message}`);
   }
-  
-  console.log("[SETUP] Table ready for test");
 });
-
 test("scan QR → menu list makeorderwitout split", async ({ page, context }) => {
   test.setTimeout(300000); // Set timeout to 5 minutes
 
@@ -248,9 +261,8 @@ test("scan QR → menu list makeorderwitout split", async ({ page, context }) =>
     console.log("[SUCCESS] Payment receipt verified");
 
     // Reset Table Status
-    await page.goto('https://dashboard-dev.vastmenu.com/branch-tables');
-    await page.locator('#switch-40').check();
-    await page1.goto('https://pwa-dev.vastmenu.com/');
+    await page.close();
+    await page1.close();
   });
 });
 ///worked cleary

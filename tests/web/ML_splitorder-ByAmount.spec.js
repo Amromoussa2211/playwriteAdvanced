@@ -201,7 +201,7 @@ test("scanQR →ML splitOrder(BYamount) &Validate in report", async ({ page, con
   // --- STEP 7: SPLIT PAYMENT (PART 2 - REMAINING) ---
   await test.step("Perform Second Split Payment (Remaining)", async () => {
     // Navigate manually to success page state
-    await page1.goto('https://pwa-dev.vastmenu.com/payment-success/?table_id=2fe4ca70-6b80-4c12-b1d0-3dc36060a908&order_id=45e81da665814e24b455b62334ec72d7&paymentStatus=success&payment_split_id=6241');
+    // await page1.goto('https://pwa-dev.vastmenu.com/payment-success/?table_id=2fe4ca70-6b80-4c12-b1d0-3dc36060a908&order_id=45e81da665814e24b455b62334ec72d7&paymentStatus=success&payment_split_id=6241');
     await page1.locator('#q-portal--dialog--1').getByRole('button', { name: 'Home' }).click();
     
     const totalBtn = page1.getByRole('button', { name: '4 Item Total' });
