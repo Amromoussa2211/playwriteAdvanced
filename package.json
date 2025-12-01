@@ -8,6 +8,7 @@
     "test:web": "playwright test --config=config/playwright.config.js --reporter=line",
     "test:mobile": "node tests/mobile/runner.js",
     "test:performance": "node tests/performance/runner.js",
+    "test:security": "playwright test tests/web/security.spec.js --config=config/playwright.config.js --reporter=json > security-results.json; node generate_security_report.js",
     "test:all": "npm run test:web && npm run test:mobile",
     "test:parallel": "npm run test:web & npm run test:mobile",
     "report": "playwright show-report",

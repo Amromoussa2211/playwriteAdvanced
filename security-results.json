@@ -1,0 +1,952 @@
+{
+  "config": {
+    "configFile": "/Users/t/Desktop/playwriteAdvanced/config/playwright.config.js",
+    "rootDir": "/Users/t/Desktop/playwriteAdvanced/tests/web",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/t/Desktop/playwriteAdvanced/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/t/Desktop/playwriteAdvanced/tests/web",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/Users/t/Desktop/playwriteAdvanced/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/t/Desktop/playwriteAdvanced/tests/web",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "security.spec.js",
+      "file": "security.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "🔐 Full Security Suite (Soft Mode - All Pass)",
+          "file": "security.spec.js",
+          "line": 15,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Sensitive Files Exposure (.env, backups, db dumps)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2767,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:10:26.005Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "Sensitive Files",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ09NUExFVEVEIiwKICAiZGV0YWlscyI6IFsKICAgIHsKICAgICAgImZpbGUiOiAiLmVudiIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJleHBvc2VkIjogdHJ1ZQogICAgfSwKICAgIHsKICAgICAgImZpbGUiOiAiZW52IiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImV4cG9zZWQiOiB0cnVlCiAgICB9LAogICAgewogICAgICAiZmlsZSI6ICIuZW52LmxvY2FsIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImV4cG9zZWQiOiB0cnVlCiAgICB9LAogICAgewogICAgICAiZmlsZSI6ICJiYWNrdXAuemlwIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImV4cG9zZWQiOiB0cnVlCiAgICB9LAogICAgewogICAgICAiZmlsZSI6ICJkYi5zcWwiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAiZXhwb3NlZCI6IHRydWUKICAgIH0sCiAgICB7CiAgICAgICJmaWxlIjogImR1bXAuc3FsIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImV4cG9zZWQiOiB0cnVlCiAgICB9LAogICAgewogICAgICAiZmlsZSI6ICIuZ2l0L2NvbmZpZyIsCiAgICAgICJzdGF0dXMiOiA0MDQsCiAgICAgICJleHBvc2VkIjogZmFsc2UKICAgIH0sCiAgICB7CiAgICAgICJmaWxlIjogIi5naXQvSEVBRCIsCiAgICAgICJzdGF0dXMiOiA0MDQsCiAgICAgICJleHBvc2VkIjogZmFsc2UKICAgIH0KICBdCn0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-e9897a427e0059140e1b",
+              "file": "security.spec.js",
+              "line": 22,
+              "column": 7
+            },
+            {
+              "title": "CORS Policy Basic Check",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 162,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:10:28.825Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "CORS Policy",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiYWxsb3dlZE9yaWdpbiI6ICIqIgogIH0KfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-bfd8f25fdb3b7b854f45",
+              "file": "security.spec.js",
+              "line": 44,
+              "column": 7
+            },
+            {
+              "title": "Mixed Content Check",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2246,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:10:29.018Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "Mixed Content",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiTk9ORSIsCiAgImRldGFpbHMiOiB7CiAgICAibWl4ZWRGb3VuZCI6IGZhbHNlCiAgfQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-9b37dacc7af4a0281264",
+              "file": "security.spec.js",
+              "line": 54,
+              "column": 7
+            },
+            {
+              "title": "Version Disclosure (Server / X-Powered-By)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 177,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:10:32.246Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "Version Disclosure",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAic2VydmVyIjogImNsb3VkZmxhcmUiLAogICAgInhQb3dlcmVkQnkiOiAiUEhQLzguMy4yNCIKICB9Cn0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-8c354c2ce7aa4ad41aaa",
+              "file": "security.spec.js",
+              "line": 68,
+              "column": 7
+            },
+            {
+              "title": "A01 - Broken Access Control (unauthenticated access to dashboard)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 211,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:10:32.454Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A01 Broken Access Control",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiaW5pdGlhbFN0YXR1cyI6IDIwMCwKICAgICJyZWRpcmVjdGVkVG9Mb2dpbiI6IGZhbHNlCiAgfQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-285c94f0966b2e7f2ac8",
+              "file": "security.spec.js",
+              "line": 80,
+              "column": 7
+            },
+            {
+              "title": "A02 - HTTPS / HSTS Enforcement",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 131,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:10:32.709Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A02 Cryptographic Failures",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiaHN0cyI6IG51bGwKICB9Cn0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-5339155f3fd29f38c573",
+              "file": "security.spec.js",
+              "line": 94,
+              "column": 7
+            },
+            {
+              "title": "A04 - Insecure Design / Brute Force Indicators",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 123133,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:10:32.858Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/t/Desktop/playwriteAdvanced/test-results/security-🔐-Full-Security--42d91-sign-Brute-Force-Indicators-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "A04 Brute Force",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiYnJ1dGVGb3JjZURldGVjdGVkIjogZmFsc2UKICB9Cn0="
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/t/Desktop/playwriteAdvanced/test-results/security-🔐-Full-Security--42d91-sign-Brute-Force-Indicators-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/t/Desktop/playwriteAdvanced/test-results/security-🔐-Full-Security--42d91-sign-Brute-Force-Indicators-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/t/Desktop/playwriteAdvanced/test-results/security-🔐-Full-Security--42d91-sign-Brute-Force-Indicators-chromium/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-b2bf03fbbdb927746644",
+              "file": "security.spec.js",
+              "line": 105,
+              "column": 7
+            },
+            {
+              "title": "A05 - Security Misconfiguration (headers check)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 445,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:38.798Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A05 Security Misconfiguration",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAibWlzc2luZyI6IFsKICAgICAgIngtY29udGVudC10eXBlLW9wdGlvbnMiLAogICAgICAicmVmZXJyZXItcG9saWN5IgogICAgXQogIH0KfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-20893b8123d637bd23a8",
+              "file": "security.spec.js",
+              "line": 122,
+              "column": 7
+            },
+            {
+              "title": "A08 - Software & Data Integrity Failures (external scripts)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2164,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:39.287Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A08 Integrity Failures",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiZXh0ZXJuYWwiOiBbCiAgICAgICJodHRwczovL3N0YXRpYy5jbG91ZGZsYXJlaW5zaWdodHMuY29tL2JlYWNvbi5taW4uanMvdmNkMTVjYmU3NzcyZjQ5YzM5OWM2YTViYWJmMjJjMTI0MTcxNzY4OTE3NjAxNSIKICAgIF0KICB9Cn0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-db9f0e49e1f4c3e1d9ed",
+              "file": "security.spec.js",
+              "line": 139,
+              "column": 7
+            },
+            {
+              "title": "A09 - Security Logging & Monitoring Failures (runtime errors)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1535,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:41.906Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A09 Logging & Monitoring",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAicnVudGltZUVycm9ycyI6IFsKICAgICAgIldlYlNvY2tldCBjb25uZWN0aW9uIHRvICd3c3M6Ly9hcGktZGV2LnZhc3RtZW51LmNvbS9hcHAvTVlLRVk/cHJvdG9jb2w9NyZjbGllbnQ9anMmdmVyc2lvbj03LjAuMyZmbGFzaD1mYWxzZScgZmFpbGVkOiBFcnJvciBkdXJpbmcgV2ViU29ja2V0IGhhbmRzaGFrZTogVW5leHBlY3RlZCByZXNwb25zZSBjb2RlOiA0MDQiCiAgICBdCiAgfQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-7c10fd6492a86b4deeac",
+              "file": "security.spec.js",
+              "line": 154,
+              "column": 7
+            },
+            {
+              "title": "Sensitive Files Exposure (.env, backups, db dumps)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1386,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:45.423Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "Sensitive Files",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ09NUExFVEVEIiwKICAiZGV0YWlscyI6IFsKICAgIHsKICAgICAgImZpbGUiOiAiLmVudiIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJleHBvc2VkIjogdHJ1ZQogICAgfSwKICAgIHsKICAgICAgImZpbGUiOiAiZW52IiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImV4cG9zZWQiOiB0cnVlCiAgICB9LAogICAgewogICAgICAiZmlsZSI6ICIuZW52LmxvY2FsIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImV4cG9zZWQiOiB0cnVlCiAgICB9LAogICAgewogICAgICAiZmlsZSI6ICJiYWNrdXAuemlwIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImV4cG9zZWQiOiB0cnVlCiAgICB9LAogICAgewogICAgICAiZmlsZSI6ICJkYi5zcWwiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAiZXhwb3NlZCI6IHRydWUKICAgIH0sCiAgICB7CiAgICAgICJmaWxlIjogImR1bXAuc3FsIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgImV4cG9zZWQiOiB0cnVlCiAgICB9LAogICAgewogICAgICAiZmlsZSI6ICIuZ2l0L2NvbmZpZyIsCiAgICAgICJzdGF0dXMiOiA0MDQsCiAgICAgICJleHBvc2VkIjogZmFsc2UKICAgIH0sCiAgICB7CiAgICAgICJmaWxlIjogIi5naXQvSEVBRCIsCiAgICAgICJzdGF0dXMiOiA0MDQsCiAgICAgICJleHBvc2VkIjogZmFsc2UKICAgIH0KICBdCn0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-8e3a2f6031a6b54de4b7",
+              "file": "security.spec.js",
+              "line": 22,
+              "column": 7
+            },
+            {
+              "title": "CORS Policy Basic Check",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 138,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:46.853Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "CORS Policy",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiYWxsb3dlZE9yaWdpbiI6ICIqIgogIH0KfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-3066c29c32de65b46f4e",
+              "file": "security.spec.js",
+              "line": 44,
+              "column": 7
+            },
+            {
+              "title": "Mixed Content Check",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6501,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:47.026Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "Mixed Content",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiTk9ORSIsCiAgImRldGFpbHMiOiB7CiAgICAibWl4ZWRGb3VuZCI6IGZhbHNlCiAgfQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-1581acab8a9351fcf856",
+              "file": "security.spec.js",
+              "line": 54,
+              "column": 7
+            },
+            {
+              "title": "Version Disclosure (Server / X-Powered-By)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 151,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:57.406Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "Version Disclosure",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAic2VydmVyIjogImNsb3VkZmxhcmUiLAogICAgInhQb3dlcmVkQnkiOiAiUEhQLzguMy4yNCIKICB9Cn0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-cc8e0633ba85a1243824",
+              "file": "security.spec.js",
+              "line": 68,
+              "column": 7
+            },
+            {
+              "title": "A01 - Broken Access Control (unauthenticated access to dashboard)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 132,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:57.592Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A01 Broken Access Control",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiaW5pdGlhbFN0YXR1cyI6IDIwMCwKICAgICJyZWRpcmVjdGVkVG9Mb2dpbiI6IGZhbHNlCiAgfQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-d82613c53ca788747393",
+              "file": "security.spec.js",
+              "line": 80,
+              "column": 7
+            },
+            {
+              "title": "A02 - HTTPS / HSTS Enforcement",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 144,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:57.753Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A02 Cryptographic Failures",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiaHN0cyI6IG51bGwKICB9Cn0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-ec7a5427c70fbb68c475",
+              "file": "security.spec.js",
+              "line": 94,
+              "column": 7
+            },
+            {
+              "title": "A04 - Insecure Design / Brute Force Indicators",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 125383,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 120000ms exceeded.\u001b[39m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:12:57.913Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/t/Desktop/playwriteAdvanced/test-results/security-🔐-Full-Security--42d91-sign-Brute-Force-Indicators-firefox/test-failed-1.png"
+                        },
+                        {
+                          "name": "A04 Brute Force",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiYnJ1dGVGb3JjZURldGVjdGVkIjogZmFsc2UKICB9Cn0="
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/t/Desktop/playwriteAdvanced/test-results/security-🔐-Full-Security--42d91-sign-Brute-Force-Indicators-firefox/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/t/Desktop/playwriteAdvanced/test-results/security-🔐-Full-Security--42d91-sign-Brute-Force-Indicators-firefox/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/t/Desktop/playwriteAdvanced/test-results/security-🔐-Full-Security--42d91-sign-Brute-Force-Indicators-firefox/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-7cc6ac198ce07102e282",
+              "file": "security.spec.js",
+              "line": 105,
+              "column": 7
+            },
+            {
+              "title": "A05 - Security Misconfiguration (headers check)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 429,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:15:09.836Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A05 Security Misconfiguration",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAibWlzc2luZyI6IFsKICAgICAgIngtY29udGVudC10eXBlLW9wdGlvbnMiLAogICAgICAicmVmZXJyZXItcG9saWN5IgogICAgXQogIH0KfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-186bfad535a9e2945245",
+              "file": "security.spec.js",
+              "line": 122,
+              "column": 7
+            },
+            {
+              "title": "A08 - Software & Data Integrity Failures (external scripts)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4973,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:15:10.320Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A08 Integrity Failures",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAiZXh0ZXJuYWwiOiBbCiAgICAgICJodHRwczovL3N0YXRpYy5jbG91ZGZsYXJlaW5zaWdodHMuY29tL2JlYWNvbi5taW4uanMvdmNkMTVjYmU3NzcyZjQ5YzM5OWM2YTViYWJmMjJjMTI0MTcxNzY4OTE3NjAxNSIKICAgIF0KICB9Cn0="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-77eb7a15c69565b0e99f",
+              "file": "security.spec.js",
+              "line": 139,
+              "column": 7
+            },
+            {
+              "title": "A09 - Security Logging & Monitoring Failures (runtime errors)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1945,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-11-30T22:15:17.963Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "A09 Logging & Monitoring",
+                          "contentType": "application/json",
+                          "body": "ewogICJzdGF0dXMiOiAiQ0hFQ0tFRCIsCiAgImRldGFpbHMiOiB7CiAgICAicnVudGltZUVycm9ycyI6IFtdCiAgfQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3efa7971ab9a8dd627a5-4f782e4d9f4cbccfd971",
+              "file": "security.spec.js",
+              "line": 154,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-11-30T22:10:24.063Z",
+    "duration": 298088.978,
+    "expected": 18,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}
