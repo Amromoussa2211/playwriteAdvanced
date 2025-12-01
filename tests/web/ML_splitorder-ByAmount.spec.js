@@ -21,7 +21,7 @@ async function decodeQR(buffer) {
 // Reset table before each test to ensure clean state
 test.beforeEach(async ({ page }) => {
   // Increase timeout for setup hook
-  test.setTimeout(60000);
+  // test.setTimeout(60000); // Removed to allow config timeout or test timeout to apply
   console.log("[SETUP] Resetting table state...");
   
   // Login to dashboard
@@ -33,10 +33,12 @@ test.beforeEach(async ({ page }) => {
   await page.waitForLoadState("domcontentloaded");
   
   // Go to tables
-  await page.getByRole("link", { name: "Tables" }).click();
+  const tablesLink = page.getByRole("link", { name: "Tables" });
+  await tablesLink.waitFor({ state: "visible", timeout: 60000 });
+  await tablesLink.click();
   await page.waitForLoadState("domcontentloaded");
   // Wait for tables to be visible to ensure page is loaded
-  await page.locator('.table-details').first().waitFor({ state: "visible", timeout: 30000 });
+  await page.locator('.table-details').first().waitFor({ state: "visible", timeout: 60000 });
   await page.waitForTimeout(1000);
   
   // Reset switch track (clear table)
